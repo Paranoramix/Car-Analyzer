@@ -1,19 +1,60 @@
 #include "config.h"
 
-#include <Arduino.h>
-
 ///////////////////////////////////////////////////////////////////
 // OTA Update
 ///////////////////////////////////////////////////////////////////
+
+#include "elegantWebpage.h"
+#include "webserialWebpage.h"
+
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
+#include <WebSerial.h>
 
 const char* ssid = "Car-Analyzer";
 const char* password = "123456789";
 
 AsyncWebServer server(80);
+
+/* Message callback of WebSerial */
+void recvMsg(uint8_t *data, size_t len){
+  WebSerial.println("Received Data...");
+  String d = "";
+  for(int i=0; i < len; i++){
+    d += char(data[i]);
+  }
+  WebSerial.println(d);
+}
+
+void setupWiFi(void) {
+  WiFi.softAP(ssid, password);
+
+  AsyncElegantOTA.begin(&server);
+
+  // WebSerial is accessible at "<IP Address>/webserial" in browser
+  WebSerial.begin(&server);
+  /* Attach Message Callback */
+  WebSerial.msgCallback(recvMsg);
+
+
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", "Hi! I am ESP32.");
+  });
+
+
+  server.begin();
+
+  delay(10000);
+  SerialMon.println("Car Analyzer v0.0.1");
+  SerialMon.println("...");
+  delay(1000);
+  SerialMon.println("--- Started! ");
+  SerialMon.println("");
+  SerialMon.println("");
+  SerialMon.println("");
+}
 
 
 ///////////////////////////////////////////////////////////////////
@@ -25,6 +66,8 @@ TinyGsmClient gsmClientHomeAssistant(gsmModem, 0);
 TinyGsmClient gsmClientABRP(gsmModem, 1);
 
 void setupGsm(void) {
+  SerialMon.println("GSM Initialization...");
+
   GsmSerial.begin(9600, SERIAL_8N1, GSM_MODEM_RX, GSM_MODEM_TX);
   delay(100);
 
@@ -32,46 +75,49 @@ void setupGsm(void) {
   // En cas de plantage de l'ESP, la carte SIM7000E peut être déjà démarrée.
   // Il n'est donc pas nécessaire de redémarrer le modem.
 
-  SerialMon.print("--- Vérification de l'état du Modem...  ");
+  SerialMon.print("--- Checking modem status...  ");
 
   if (!gsmModem.isGprsConnected()) {
-    SerialMon.println("KO [réseau non connecté]");
-    SerialMon.print("   => Réinitialisation du modem...      ");
+    SerialMon.println("KO [Not connected to network]");
+    SerialMon.print("   => Modem reset...                    ");
 
     if (!gsmModem.init(simPin)) {
       SerialMon.println("KO");
-      SerialMon.print("   => Redémarrage du modem...           ");
+      SerialMon.print("   => Restarting modem...               ");
 
       if (!gsmModem.restart(simPin)) {
-        SerialMon.println("KO. Veuillez débrancher / rebrancher tout le système.");
+        SerialMon.println("KO. Please unplug / plug the device!");
         while(true) { }
       }
     }
   }
 
-  SerialMon.println("Succès :)");
+  SerialMon.println("OK :)");
 
   // Ensuite, quelquesoit la situation, on essayer de déverrouiller la carte SIM.
   if (gsmModem.getSimStatus() != 1 && gsmModem.getSimStatus() != 3) {
-    SerialMon.println("--- Déverrouillage de la carte SIM...   ");
+    SerialMon.println("--- Unlocking SIM Card...             ");
 
     if (!gsmModem.simUnlock(simPin)) {
         SerialMon.println("KO");
     } else {
-      SerialMon.println("Succès :)");
+      SerialMon.println("OK :)");
     }
   }
 
   // Ensuite, si on n'est pas connecté, alors on se connecte.
   if (!gsmModem.isGprsConnected()) {
-    SerialMon.print("--- Connexion au réseau GSM...          ");
+    SerialMon.print("--- Connecting to GPRS network...       ");
 
     if(!gsmModem.gprsConnect(gsmApn, gsmGprsUser, gsmGprsPass)) {
       SerialMon.println("KO");
     }
 
-    SerialMon.println("Succès :)");
+    SerialMon.println("OK :)");
   }
+}
+
+void updateGsmData(void) {
 
   // L'initialisation de la carte GSM est terminée.
   // On affiche toutes les informations !
@@ -120,34 +166,75 @@ void setupGsm(void) {
 
   SerialMon.print("--- Registration Status: ");
   SerialMon.println(gsmModem.getRegistrationStatus());
-
-
 }
 
-void setupWiFi(void) {
-  WiFi.softAP(ssid, password);
+///////////////////////////////////////////////////////////////////
+// GPS
+///////////////////////////////////////////////////////////////////
+void setupGps(void) {
+  SerialMon.println("GPS Initialization...");
 
-  AsyncElegantOTA.begin(&server);
+  SerialMon.print("--- Starting GPS...                     ");
 
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "text/plain", "Hi! I am ESP32.");
-  });
-
-  server.begin();
+  if (gsmModem.enableGPS()) {
+    SerialMon.println("OK :)");
+  } else {
+    SerialMon.println("KO");
+  }
 }
+
+void updateGpsData(void) {
+  if (gsmModem.getGPS(&latitude, &longitude, &speed, &altitude, &visibleSat, &usedSat, &accuracy, &year, &month, &day, &hour, &minute, &second)) {
+    SerialMon.print("--- Latitude, Longitude: ");
+    SerialMon.println(String(latitude, 8) + String(", ") + String(longitude, 8));
+
+    SerialMon.print("--- Speed: ");
+    SerialMon.println(speed);
+
+    SerialMon.print("--- Altitude: ");
+    SerialMon.println(altitude);
+
+    SerialMon.print("--- Visible Sat: ");
+    SerialMon.println(visibleSat);
+
+    SerialMon.print("--- Used Sat: ");
+    SerialMon.println(usedSat);
+
+    SerialMon.print("--- Accuracy: ");
+    SerialMon.println(accuracy);
+
+    SerialMon.print("--- Date & Time: ");
+    SerialMon.println(year + String("/") + month + String("/") + day + String(" ") + hour + String(":") + minute + String(":") + second);
+  } else {
+    SerialMon.println("Couldn't get GPS/GNSS/GLONASS location");
+    SerialMon.println(gsmModem.getGPSraw());
+
+  }
+}
+
+
 
 void setup(void) {
-  SerialMon.begin(9600);
+  Serial.begin(9600);
 
   Serial.println("");
-  Serial.println(ESP.getFlashChipSize());
-  Serial.println("");
-
-  setupGsm();
   
   setupWiFi();
+  
+  setupGsm();
+  updateGsmData();
+
+  setupGps();
+  updateGpsData();
+    
+
 }
 
+long t = 0;
 void loop(void) {
-  // put your main code here, to run repeatedly:
+  if (millis() - t > 10000) {
+    t = millis();
+    updateGpsData();
+    updateGsmData();
+  }
 }
