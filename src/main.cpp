@@ -5,27 +5,16 @@
 ///////////////////////////////////////////////////////////////////
 // OTA Update
 ///////////////////////////////////////////////////////////////////
-#include <HTTPClient.h>
-#include <HTTPUpdate.h>
-#include <WiFiClientSecure.h>
-#include "cert.h"
 #include <WiFi.h>
-
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <AsyncElegantOTA.h>
 
 const char* ssid = "Car-Analyzer";
 const char* password = "123456789";
 
-String FirmwareVersion = {
-  "2.2"
-};
+AsyncWebServer server(80);
 
-#define URL_fw_Version "https://raw.githubusercontent.com/programmer131/ESP8266_ESP32_SelfUpdate/master/esp32_ota/bin_version.txt"
-#define URL_fw_Bin "https://raw.githubusercontent.com/programmer131/ESP8266_ESP32_SelfUpdate/master/esp32_ota/fw.bin"
-
-
-void setupWiFi(void) {
-  WiFi.softAP(ssid, password);
-}
 
 ///////////////////////////////////////////////////////////////////
 // GSM
@@ -131,8 +120,21 @@ void setupGsm(void) {
 
   SerialMon.print("--- Registration Status: ");
   SerialMon.println(gsmModem.getRegistrationStatus());
+
+
 }
 
+void setupWiFi(void) {
+  WiFi.softAP(ssid, password);
+
+  AsyncElegantOTA.begin(&server);
+
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", "Hi! I am ESP32.");
+  });
+
+  server.begin();
+}
 
 void setup(void) {
   SerialMon.begin(9600);
