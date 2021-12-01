@@ -12,6 +12,9 @@
 
                 ws.onopen = function() {
                     console.log('Socket ' + socketName + ' Opened socket');
+                    timeoutVar = setTimeout(function() {
+                        ws.close();
+                    }, timeoutDisconnected);
                 };
                 
                 ws.onmessage = function(evt) {
@@ -41,7 +44,7 @@
         <table style="width: 100%; border: 1px solid;max-width: 100%">
             <tr>
                 <td><button value="gsm" onclick="connectSocket('gsm', disconnectTimeoutGsm, 30000);" >Enable/Disable GSM</button></td>
-                <td><button value="chip" onclick="connectSocket('chip', disconnectTimeoutGsm, 10000);">Enable/Disable CHIP</button></td>
+                <td><button value="chip" onclick="connectSocket('chip', disconnectTimeoutGsm, 2000);">Enable/Disable CHIP</button></td>
                 <td><button value="gps" onclick="connectSocket('gps', disconnectTimeoutGps, 5000);">Enable/Disable GPS</button></td>
                 <td><button value="logs" onclick="connectSocket('logs', disconnectTimeoutLogs, 500, 1000);">Enable/Disable LOGS</button></td>
             </tr>

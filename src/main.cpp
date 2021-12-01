@@ -1,4 +1,5 @@
 #include "config.h"
+#include <ESP32Time.h>
 
 ///////////////////////////////////////////////////////////////////
 // Web Server & WiFi
@@ -10,6 +11,12 @@
 
 AsyncWebServer server(80);
 
+
+///////////////////////////////////////////////////////////////////
+// Data definitions
+///////////////////////////////////////////////////////////////////
+#include <CarAnalyzerData.h>
+CarAnalyzerDataClass CarAnalyzerData;
 
 ///////////////////////////////////////////////////////////////////
 // Sockets definitions
@@ -71,7 +78,7 @@ void setupWiFi(void) {
 
   server.begin();
 
-  delay(10000);
+  delay(3000);
   SerialMon.println("Car Analyzer v0.0.1");
   SerialMon.println("...");
   delay(1000);
@@ -142,50 +149,59 @@ void setupGsm(void) {
 
     SerialMon.println("OK :)");
   }
+
+  // Quand le GSM est connecté, alors on initialise le CarAnalyzerData.
+  CarAnalyzerData.setModemName(gsmModem.getModemName());
+  CarAnalyzerData.setModemInfo(gsmModem.getModemInfo());
+  CarAnalyzerData.setSimStatus(gsmModem.getSimStatus());
+  CarAnalyzerData.setSimCCID(gsmModem.getSimCCID());
+  CarAnalyzerData.setImei(gsmModem.getIMEI());
+  CarAnalyzerData.setImsi(gsmModem.getIMSI());
+  CarAnalyzerData.setGsmOperator(gsmModem.getOperator());
+  CarAnalyzerData.setSignalQuality(gsmModem.getSignalQuality());
+  CarAnalyzerData.setRegistrationStatus(gsmModem.getRegistrationStatus());
+  CarAnalyzerData.setLocalIP(gsmModem.getLocalIP());
 }
-
+/*
 void abrpUpdate(void) {
-  const char* abrpApiKey = "32b2162f-9599-4647-8139-66e9f9528370";
-  const char* abrpToken = "68131ce8-a73d-4420-90f9-10a93ea30208";
-  const char* abrpapiUrl = "http://api.iternio.com/1/tlm/send";
-
   DynamicJsonDocument  doc(1000);
+  doc["utc"] = epoch;
   doc["soc"] = 29;
   doc["soh"] = 100;
   doc["speed"] = speed;
   doc["lat"] = latitude;
   doc["lon"] = longitude;
   doc["elevation"] = altitude;
-  doc["car_model"] = "hyundai:ioniq5:22:74";
+  doc["car_model"] = String(abrpCarModel);
 
   String data;
   serializeJson(doc, data);  
   HttpClient httpClienABRP(gsmClientABRP, "api.iternio.com", 80);
-  String r = "/1/tlm/send?api_key=32b2162f-9599-4647-8139-66e9f9528370&token=68131ce8-a73d-4420-90f9-10a93ea30208&tlm=" + data;
+  String r = "/1/tlm/send?api_key=" + String(abrpApiKey) + "&token=" + String(abrpToken) + "&tlm=" + data;
   Serial.println(r);
   Serial.println(httpClienABRP.get(r));
   int status = httpClienABRP.responseStatusCode();
   Serial.print(F("Response status code: "));
   Serial.println(status);
 }
+*/
 
-void updateGsmData(void) {
-  DynamicJsonDocument  doc(1000);
+void updateGsmData(bool init = false) {
+  if (init) {
+    Serial.println("INIT GSM");
 
-  doc["time"]               = millis();
-  doc["modemName"]          = gsmModem.getModemName();
-  doc["modemInfo"]          = gsmModem.getModemInfo();
-  doc["simStatus"]          = gsmModem.getSimStatus();
-  doc["gprsStatus"]         = gsmModem.isGprsConnected();
-  doc["ccid"]               = gsmModem.getSimCCID();
-  doc["imei"]               = gsmModem.getIMEI();
-  doc["imsi"]               = gsmModem.getIMSI();
-  doc["gsmOperator"]        = gsmModem.getOperator();
-  doc["signalQuality"]      = gsmModem.getSignalQuality();
-  doc["networkMode"]        = gsmModem.getNetworkMode();
-  doc["registrationStatus"] = gsmModem.getRegistrationStatus();
+    CarAnalyzerData.setModemName(gsmModem.getModemName());
+    CarAnalyzerData.setModemInfo(gsmModem.getModemInfo());
+    CarAnalyzerData.setSimCCID(gsmModem.getSimCCID());
+    CarAnalyzerData.setImei(gsmModem.getIMEI());
+    CarAnalyzerData.setImsi(gsmModem.getIMSI());
+  }
 
-  GsmSocket.send(doc);
+  CarAnalyzerData.setSimStatus(gsmModem.getSimStatus());
+  CarAnalyzerData.setGsmOperator(gsmModem.getOperator());
+  CarAnalyzerData.setSignalQuality(gsmModem.getSignalQuality());
+  CarAnalyzerData.setRegistrationStatus(gsmModem.getRegistrationStatus());
+  CarAnalyzerData.setLocalIP(gsmModem.getLocalIP());
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -203,127 +219,101 @@ void setupGps(void) {
   }
 }
 
-void updateGpsData(void) {
-  DynamicJsonDocument  doc(500);
-  doc["time"]               = millis();
+void updateGpsData(bool init = false) {
+  float latitude          = 0;
+  float longitude         = 0;
+  float speed             = 0;
+  float altitude          = 0;
+  int   visibleSat        = 0;
+  int   usedSat           = 0;
+  float accuracy          = 0;
+
+  int   year              = 0;
+  int   month             = 0;
+  int   day               = 0;
+  int   hour              = 0;
+  int   minute            = 0;
+  int   second            = 0;
+  
+  ESP32Time rtc;
 
   if (gsmModem.getGPS(&latitude, &longitude, &speed, &altitude, &visibleSat, &usedSat, &accuracy, &year, &month, &day, &hour, &minute, &second)) {
-  
-    doc["latitude"]           = latitude;
-    doc["longitude"]          = longitude;
-    doc["speed"]              = speed;
-    doc["altitude"]           = altitude;
-    doc["visibleSat"]         = visibleSat;
-    doc["usedSat"]            = usedSat;
-    doc["accuracy"]           = accuracy;
-    doc["year"]               = year;
-    doc["month"]              = month;
-    doc["day"]                = day;
-    doc["hour"]               = hour;
-    doc["minute"]             = minute;
-    doc["second"]             = second;
-  } else {
-    doc["latitude"]         = "";
-    doc["longitude"]        = "";
-    doc["speed"]            = "";
-    doc["altitude"]         = "";
-    doc["visibleSat"]       = "";
-    doc["usedSat"]          = "";
-    doc["accuracy"]         = "";
-    doc["year"]             = "";
-    doc["month"]            = "";
-    doc["day"]              = "";
-    doc["hour"]             = "";
-    doc["minute"]           = "";
-    doc["second"]           = "";
+    rtc.setTime(second, minute, hour, day, month, year);
+
+    CarAnalyzerData.setLatitude(latitude);
+    CarAnalyzerData.setLongitude(longitude);
+    CarAnalyzerData.setSpeed(speed);
+    CarAnalyzerData.setAltitude(altitude);
+    CarAnalyzerData.setVisibleSat(visibleSat);
+    CarAnalyzerData.setUsedSat(usedSat);
+    CarAnalyzerData.setAccuracy(accuracy);
+    CarAnalyzerData.setEpoch(rtc.getEpoch());
   }
-
-
-  GpsSocket.send(doc);
 }
 
 
 ///////////////////////////////////////////////////////////////////
 // Chip
 ///////////////////////////////////////////////////////////////////
+
+
+void updateChipData(bool init = false) {
+  if (init) {
+    Serial.println("INIT CHIP");
+    uint32_t chipId = 0;
+      for(int i=0; i<17; i=i+8) {
+      chipId |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
+    }
+    CarAnalyzerData.setChipId(chipId);
+    CarAnalyzerData.setChipRevision(ESP.getChipRevision());
+    CarAnalyzerData.setCpuFreqMHz(ESP.getCpuFreqMHz());
+    CarAnalyzerData.setFlashChipSize(ESP.getFlashChipSize());
+    CarAnalyzerData.setFlashChipSpeed(ESP.getFlashChipSpeed());
+    CarAnalyzerData.setHeapSize(ESP.getHeapSize());
+    CarAnalyzerData.setPsramSize(ESP.getPsramSize());
+    CarAnalyzerData.setSketchMD5(ESP.getSketchMD5());
+    CarAnalyzerData.setSketchSize(ESP.getSketchSize());
+  }
+  
+  CarAnalyzerData.setFreeHeapSize(ESP.getFreeHeap());
+  CarAnalyzerData.setFreePsramSize(ESP.getFreePsram());
+}
+
+
+
+
+
 void setup(void) {
-  for(int i=0; i<17; i=i+8) {
-	  chipId |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
-	}
-
-  ChipRevision     = ESP.getChipRevision();
-  CpuFreqMHz       = ESP.getCpuFreqMHz();
-  FlashChipMode    = ESP.getFlashChipMode();
-  FlashChipSize    = ESP.getFlashChipSize();
-  FlashChipSpeed   = ESP.getFlashChipSpeed();
-  FreeHeap         = ESP.getFreeHeap();
-  FreePsram        = ESP.getFreePsram();
-  FreeSketchSpace  = ESP.getFreeSketchSpace();
-  HeapSize         = ESP.getHeapSize();
-  MaxAllocHeap     = ESP.getMaxAllocHeap();
-  MaxAllocPsram    = ESP.getMaxAllocPsram();
-  MinFreeHeap      = ESP.getMinFreeHeap();
-  MinFreePsram     = ESP.getMinFreePsram();
-  PsramSize        = ESP.getPsramSize();
-  SdkVersion       = ESP.getSdkVersion();
-  SketchMD5        = ESP.getSketchMD5();
-  SketchSize       = ESP.getSketchSize();
-
   Serial.begin(9600);
-      
-  setupCarAnalyzerSockets();
-
   Serial.println("");
   
   setupWiFi();
-
-  
   setupGsm();
-  updateGsmData();
-  
   setupGps();
-  updateGpsData();
-
-  delay(10000);
-
-  abrpUpdate();
-
+  setupCarAnalyzerSockets();
   
+  delay(2000);
 
+  updateChipData(true);
+  updateGsmData(true);
+  updateGpsData(true);
+  
+  ChipSocket.send(CarAnalyzerData.getAllData());
 }
 
-void updateChip(void) {
-  DynamicJsonDocument  doc(500);
-  doc["time"]             = millis();
-  doc["ChipId"]           = String(chipId, HEX);
-  doc["ChipRevision"]     = ChipRevision;
-  doc["CpuFreqMHz"]       = CpuFreqMHz;
-  doc["FlashChipMode"]    = FlashChipMode;
-  doc["FlashChipSize"]    = FlashChipSize;
-  doc["FlashChipSpeed"]   = FlashChipSpeed;
-  doc["FreeHeap"]         = ESP.getFreeHeap();
-  doc["FreePsram"]        = ESP.getFreePsram();
-  doc["FreeSketchSpace"]  = FreeSketchSpace;
-  doc["HeapSize"]         = HeapSize;
-  doc["MaxAllocHeap"]     = MaxAllocHeap;
-  doc["MaxAllocPsram"]    = MaxAllocPsram;
-  doc["MinFreeHeap"]      = MinFreeHeap;
-  doc["MinFreePsram"]     = MinFreePsram;
-  doc["PsramSize"]        = PsramSize;
-  doc["SdkVersion"]       = SdkVersion;
-  doc["SketchMD5"]        = SketchMD5;
-  doc["SketchSize"]       = SketchSize;
-
-  ChipSocket.send(doc);
-}
 
 long t = 0;
+
+
 void loop(void) {
   if (millis() - t > 1000) {
     t = millis();
     updateGpsData();
     updateGsmData();
-    updateChip();
-    Serial.println("ping");
+    updateChipData();
+
+  
+  ChipSocket.send(CarAnalyzerData.getChangedData());
+
   }
 }
