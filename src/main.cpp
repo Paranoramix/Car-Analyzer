@@ -1,32 +1,54 @@
 #include "config.h"
 
 ///////////////////////////////////////////////////////////////////
+// Web Server & WiFi
+///////////////////////////////////////////////////////////////////
+#include <WiFi.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <ArduinoJson.h>
+
+AsyncWebServer server(80);
+
+
+///////////////////////////////////////////////////////////////////
+// Sockets definitions
+///////////////////////////////////////////////////////////////////
+#include <CarAnalyzerSocket.h>
+
+// LogsSocket est utilisé pour les messages de journalisation.
+CarAnalyzerSocketClass LogsSocket;
+
+// ChipSocket est utilisé pour les données de la puce ESP.
+CarAnalyzerSocketClass ChipSocket;
+
+// GsmSocket est utilisé pour les données de la puce GSM.
+CarAnalyzerSocketClass GsmSocket;
+
+// GpsSocket est utilisé pour les données GPS.
+CarAnalyzerSocketClass GpsSocket;
+
+void setupCarAnalyzerSockets(void) {
+  LogsSocket.begin(&server, "log");
+  ChipSocket.begin(&server, "chip");
+  GsmSocket.begin(&server, "gsm");
+  GpsSocket.begin(&server, "gps");
+}
+
+
+
+
+
+///////////////////////////////////////////////////////////////////
 // OTA Update
 ///////////////////////////////////////////////////////////////////
 
 #include "elegantWebpage.h"
-#include "webserialWebpage.h"
 
-#include <WiFi.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
-#include <WebSerial.h>
 
 const char* ssid = "Car-Analyzer";
 const char* password = "123456789";
-
-AsyncWebServer server(80);
-
-/* Message callback of WebSerial */
-void recvMsg(uint8_t *data, size_t len){
-  WebSerial.println("Received Data...");
-  String d = "";
-  for(int i=0; i < len; i++){
-    d += char(data[i]);
-  }
-  WebSerial.println(d);
-}
 
 void setupWiFi(void) {
   WiFi.softAP(ssid, password);
@@ -34,13 +56,16 @@ void setupWiFi(void) {
   AsyncElegantOTA.begin(&server);
 
   // WebSerial is accessible at "<IP Address>/webserial" in browser
-  WebSerial.begin(&server);
-  /* Attach Message Callback */
-  WebSerial.msgCallback(recvMsg);
 
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/plain", "Hi! I am ESP32.");
+  });
+
+  server.on("/logs", HTTP_GET, [](AsyncWebServerRequest *request) {
+    AsyncWebServerResponse *response = request->beginResponse(Serial, "text/plain", 12);
+    response->addHeader("Server","ESP Async Web Server");
+    request->send(response);
   });
 
 
@@ -61,6 +86,8 @@ void setupWiFi(void) {
 // GSM
 ///////////////////////////////////////////////////////////////////
 #include <TinyGSMClient.h>
+#include <ArduinoHttpClient.h>
+
 TinyGsm gsmModem(GsmSerial);
 TinyGsmClient gsmClientHomeAssistant(gsmModem, 0);
 TinyGsmClient gsmClientABRP(gsmModem, 1);
@@ -117,55 +144,48 @@ void setupGsm(void) {
   }
 }
 
+void abrpUpdate(void) {
+  const char* abrpApiKey = "32b2162f-9599-4647-8139-66e9f9528370";
+  const char* abrpToken = "68131ce8-a73d-4420-90f9-10a93ea30208";
+  const char* abrpapiUrl = "http://api.iternio.com/1/tlm/send";
+
+  DynamicJsonDocument  doc(1000);
+  doc["soc"] = 29;
+  doc["soh"] = 100;
+  doc["speed"] = speed;
+  doc["lat"] = latitude;
+  doc["lon"] = longitude;
+  doc["elevation"] = altitude;
+  doc["car_model"] = "hyundai:ioniq5:22:74";
+
+  String data;
+  serializeJson(doc, data);  
+  HttpClient httpClienABRP(gsmClientABRP, "api.iternio.com", 80);
+  String r = "/1/tlm/send?api_key=32b2162f-9599-4647-8139-66e9f9528370&token=68131ce8-a73d-4420-90f9-10a93ea30208&tlm=" + data;
+  Serial.println(r);
+  Serial.println(httpClienABRP.get(r));
+  int status = httpClienABRP.responseStatusCode();
+  Serial.print(F("Response status code: "));
+  Serial.println(status);
+}
+
 void updateGsmData(void) {
+  DynamicJsonDocument  doc(1000);
 
-  // L'initialisation de la carte GSM est terminée.
-  // On affiche toutes les informations !
-  SerialMon.println("------------------------------------------");
-  SerialMon.print("--- Modem Name: ");
-  SerialMon.println(gsmModem.getModemName());
+  doc["time"]               = millis();
+  doc["modemName"]          = gsmModem.getModemName();
+  doc["modemInfo"]          = gsmModem.getModemInfo();
+  doc["simStatus"]          = gsmModem.getSimStatus();
+  doc["gprsStatus"]         = gsmModem.isGprsConnected();
+  doc["ccid"]               = gsmModem.getSimCCID();
+  doc["imei"]               = gsmModem.getIMEI();
+  doc["imsi"]               = gsmModem.getIMSI();
+  doc["gsmOperator"]        = gsmModem.getOperator();
+  doc["signalQuality"]      = gsmModem.getSignalQuality();
+  doc["networkMode"]        = gsmModem.getNetworkMode();
+  doc["registrationStatus"] = gsmModem.getRegistrationStatus();
 
-  SerialMon.print("--- Modem Info: ");
-  SerialMon.println(gsmModem.getModemInfo());
-
-  SerialMon.print("--- SIM Status: ");
-  SerialMon.println(gsmModem.getSimStatus());
-
-  SerialMon.print("--- GPRS status: ");
-  SerialMon.println(gsmModem.isGprsConnected());
-
-  SerialMon.print("--- CCID: ");
-  SerialMon.println(gsmModem.getSimCCID());
-
-  SerialMon.print("--- IMEI: ");
-  SerialMon.println(gsmModem.getIMEI());
-
-  SerialMon.print("--- IMSI: ");
-  SerialMon.println(gsmModem.getIMSI());
-
-  SerialMon.print("--- Operator: ");
-  SerialMon.println(gsmModem.getOperator());
-
-  SerialMon.print("--- Local IP: ");
-  SerialMon.println(gsmModem.localIP());
-
-  SerialMon.print("--- Signal quality: ");
-  SerialMon.println(gsmModem.getSignalQuality()); 
-  // Signal Quality: 
-  //    0       -115 dBm ou moins         *
-  //    1       -111  dBm                 **
-  //    2...30  -110...-54 dBm            ***
-  //    31      -52 dBm ou plus           ****
-  //    99      Inconnu ou non détectable - 
-
-  SerialMon.print("--- GSM Location: ");
-  SerialMon.println(gsmModem.getGsmLocation());
-
-  SerialMon.print("--- Network Mode: ");
-  SerialMon.println(gsmModem.getNetworkMode());
-
-  SerialMon.print("--- Registration Status: ");
-  SerialMon.println(gsmModem.getRegistrationStatus());
+  GsmSocket.send(doc);
 }
 
 ///////////////////////////////////////////////////////////////////
@@ -184,57 +204,126 @@ void setupGps(void) {
 }
 
 void updateGpsData(void) {
+  DynamicJsonDocument  doc(500);
+  doc["time"]               = millis();
+
   if (gsmModem.getGPS(&latitude, &longitude, &speed, &altitude, &visibleSat, &usedSat, &accuracy, &year, &month, &day, &hour, &minute, &second)) {
-    SerialMon.print("--- Latitude, Longitude: ");
-    SerialMon.println(String(latitude, 8) + String(", ") + String(longitude, 8));
-
-    SerialMon.print("--- Speed: ");
-    SerialMon.println(speed);
-
-    SerialMon.print("--- Altitude: ");
-    SerialMon.println(altitude);
-
-    SerialMon.print("--- Visible Sat: ");
-    SerialMon.println(visibleSat);
-
-    SerialMon.print("--- Used Sat: ");
-    SerialMon.println(usedSat);
-
-    SerialMon.print("--- Accuracy: ");
-    SerialMon.println(accuracy);
-
-    SerialMon.print("--- Date & Time: ");
-    SerialMon.println(year + String("/") + month + String("/") + day + String(" ") + hour + String(":") + minute + String(":") + second);
+  
+    doc["latitude"]           = latitude;
+    doc["longitude"]          = longitude;
+    doc["speed"]              = speed;
+    doc["altitude"]           = altitude;
+    doc["visibleSat"]         = visibleSat;
+    doc["usedSat"]            = usedSat;
+    doc["accuracy"]           = accuracy;
+    doc["year"]               = year;
+    doc["month"]              = month;
+    doc["day"]                = day;
+    doc["hour"]               = hour;
+    doc["minute"]             = minute;
+    doc["second"]             = second;
   } else {
-    SerialMon.println("Couldn't get GPS/GNSS/GLONASS location");
-    SerialMon.println(gsmModem.getGPSraw());
-
+    doc["latitude"]         = "";
+    doc["longitude"]        = "";
+    doc["speed"]            = "";
+    doc["altitude"]         = "";
+    doc["visibleSat"]       = "";
+    doc["usedSat"]          = "";
+    doc["accuracy"]         = "";
+    doc["year"]             = "";
+    doc["month"]            = "";
+    doc["day"]              = "";
+    doc["hour"]             = "";
+    doc["minute"]           = "";
+    doc["second"]           = "";
   }
+
+
+  GpsSocket.send(doc);
 }
 
 
-
+///////////////////////////////////////////////////////////////////
+// Chip
+///////////////////////////////////////////////////////////////////
 void setup(void) {
+  for(int i=0; i<17; i=i+8) {
+	  chipId |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
+	}
+
+  ChipRevision     = ESP.getChipRevision();
+  CpuFreqMHz       = ESP.getCpuFreqMHz();
+  FlashChipMode    = ESP.getFlashChipMode();
+  FlashChipSize    = ESP.getFlashChipSize();
+  FlashChipSpeed   = ESP.getFlashChipSpeed();
+  FreeHeap         = ESP.getFreeHeap();
+  FreePsram        = ESP.getFreePsram();
+  FreeSketchSpace  = ESP.getFreeSketchSpace();
+  HeapSize         = ESP.getHeapSize();
+  MaxAllocHeap     = ESP.getMaxAllocHeap();
+  MaxAllocPsram    = ESP.getMaxAllocPsram();
+  MinFreeHeap      = ESP.getMinFreeHeap();
+  MinFreePsram     = ESP.getMinFreePsram();
+  PsramSize        = ESP.getPsramSize();
+  SdkVersion       = ESP.getSdkVersion();
+  SketchMD5        = ESP.getSketchMD5();
+  SketchSize       = ESP.getSketchSize();
+
   Serial.begin(9600);
+      
+  setupCarAnalyzerSockets();
 
   Serial.println("");
   
   setupWiFi();
+
   
   setupGsm();
   updateGsmData();
-
+  
   setupGps();
   updateGpsData();
-    
 
+  delay(10000);
+
+  abrpUpdate();
+
+  
+
+}
+
+void updateChip(void) {
+  DynamicJsonDocument  doc(500);
+  doc["time"]             = millis();
+  doc["ChipId"]           = String(chipId, HEX);
+  doc["ChipRevision"]     = ChipRevision;
+  doc["CpuFreqMHz"]       = CpuFreqMHz;
+  doc["FlashChipMode"]    = FlashChipMode;
+  doc["FlashChipSize"]    = FlashChipSize;
+  doc["FlashChipSpeed"]   = FlashChipSpeed;
+  doc["FreeHeap"]         = ESP.getFreeHeap();
+  doc["FreePsram"]        = ESP.getFreePsram();
+  doc["FreeSketchSpace"]  = FreeSketchSpace;
+  doc["HeapSize"]         = HeapSize;
+  doc["MaxAllocHeap"]     = MaxAllocHeap;
+  doc["MaxAllocPsram"]    = MaxAllocPsram;
+  doc["MinFreeHeap"]      = MinFreeHeap;
+  doc["MinFreePsram"]     = MinFreePsram;
+  doc["PsramSize"]        = PsramSize;
+  doc["SdkVersion"]       = SdkVersion;
+  doc["SketchMD5"]        = SketchMD5;
+  doc["SketchSize"]       = SketchSize;
+
+  ChipSocket.send(doc);
 }
 
 long t = 0;
 void loop(void) {
-  if (millis() - t > 10000) {
+  if (millis() - t > 1000) {
     t = millis();
     updateGpsData();
     updateGsmData();
+    updateChip();
+    Serial.println("ping");
   }
 }

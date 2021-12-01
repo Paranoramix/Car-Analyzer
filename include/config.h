@@ -7,31 +7,56 @@
 #define GSM_MODEM_RX 16
 #define GSM_MODEM_TX 17
 
+#define SerialMon Serial
 
-#define SerialMon WebSerial
 
+/////////////////////////////////////////////////////////////////////
+// Variables for Chip
+
+uint32_t chipId           = 0;
+uint8_t ChipRevision      = 0;
+uint32_t CpuFreqMHz       = 0;
+FlashMode_t FlashChipMode;
+uint32_t FlashChipSize    = 0;
+uint32_t FlashChipSpeed   = 0;
+uint32_t FreeHeap         = 0;
+uint32_t FreePsram        = 0;
+uint32_t FreeSketchSpace  = 0;
+uint32_t HeapSize         = 0;
+uint32_t MaxAllocHeap     = 0;
+uint32_t MaxAllocPsram    = 0;
+uint32_t MinFreeHeap      = 0;
+uint32_t MinFreePsram     = 0;
+uint32_t PsramSize        = 0;
+const char *SdkVersion;
+String SketchMD5;
+uint32_t SketchSize       = 0;
 
 /////////////////////////////////////////////////////////////////////
 // Variables for GSM
 #define GsmSerial Serial2
 
-const char* simPin        = "0000";
+const char* simPin            = "0000";
 
-const char gsmApn[]       = "orange.fr";
-const char gsmGprsUser[]  = "orange";
-const char gsmGprsPass[]  = "orange";
+const char gsmApn[]           = "orange.fr";
+const char gsmGprsUser[]      = "orange";
+const char gsmGprsPass[]      = "orange";
 
-String modemName          = "";
-String modemInfo          = "";
-String simStatus          = "";
-String gprsStatus         = "";
-String ccid               = "";
-String imei               = "";
-String imsi               = "";
-String gsmOperator        = "";
-String signalQuality      = "";
-String networkMode        = "";
-String registrationStatus = "";
+String modemName              = "";
+String modemInfo              = "";
+String simStatus              = "";
+String gprsStatus             = "";
+String ccid                   = "";
+String imei                   = "";
+String imsi                   = "";
+String gsmOperator            = "";
+String signalQuality          = "";
+String networkMode            = "";
+String registrationStatus     = "";
+
+bool abrpConnection           = true;
+bool homeAsisstantConnection  = true;
+
 
 /////////////////////////////////////////////////////////////////////
 // Variables for GPS
