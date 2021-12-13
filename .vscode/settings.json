@@ -13,6 +13,9 @@
         "initializer_list": "cpp",
         "regex": "cpp",
         "istream": "cpp",
-        "bitset": "cpp"
+        "bitset": "cpp",
+        "limits": "cpp",
+        "type_traits": "cpp",
+        "*.tcc": "cpp"
     }
 }

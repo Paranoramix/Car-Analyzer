@@ -1,8 +1,21 @@
 #include "CarAnalyzerData.h"
 
 
+struct SpiRamAllocator {
+        void* allocate(size_t size) {
+                return ps_malloc(size);
+
+        }
+        void deallocate(void* pointer) {
+                free(pointer);
+        }
+};
+
+using SpiRamJsonDocument = BasicJsonDocument<SpiRamAllocator>;
+
+
 String CarAnalyzerDataClass::getAllData(void) {
-    DynamicJsonDocument data(2000);
+    SpiRamJsonDocument data(100000);
     
     JsonObject gps = data.createNestedObject("gps");
     gps["latitude"]             = this->latitude;
@@ -44,8 +57,75 @@ String CarAnalyzerDataClass::getAllData(void) {
 }
 
 
+String CarAnalyzerDataClass::getAllDataCsv(void) {
+    String data = "";
+    data += millis();
+    data += ";";
+
+    if (this->epoch == 0) {
+        data += ";;;;;;;;";
+    } else {
+        data += this->epoch;
+        data += ";";
+        data += String(this->latitude, 6);
+        data += ";";
+        data += String(this->longitude, 6);
+        data += ";";
+        data += this->speed;
+        data += ";";
+        data += this->altitude;
+        data += ";";
+        data += this->visibleSat;
+        data += ";";
+        data += this->usedSat;
+        data += ";";
+        data += this->accuracy;
+        data += ";";
+    }
+    data += this->modemName;
+    data += ";";
+    data += this->modemInfo;
+    data += ";";
+    data += this->simStatus;
+    data += ";";
+    data += this->localIP;
+    data += ";";
+    data += this->simCCID;
+    data += ";";
+    data += this->imei;
+    data += ";";
+    data += this->imsi;
+    data += ";";
+    data += this->gsmOperator;
+    data += ";";
+    data += this->signalQuality;
+    data += ";";
+    data += this->registrationStatus;
+    data += ";";
+    data += this->chipId;
+    data += ";";
+    data += this->chipRevision;
+    data += ";";
+    data += this->cpuFreqMHz;
+    data += ";";
+    data += this->flashChipSize;
+    data += ";";
+    data += this->flashChipSpeed;
+    data += ";";
+    data += this->freeHeapSize;
+    data += ";";
+    data += this->freePsramSize;
+    data += ";";
+    data += this->sketchMD5;
+    data += ";";
+    data += this->sketchSize;
+
+    return data;
+}
+
+
 String CarAnalyzerDataClass::getChangedData(void) {
-    DynamicJsonDocument data(2000);
+    SpiRamJsonDocument data(100000);
     
     JsonObject gps = data.createNestedObject("gps");
     if (this->gpsChanges & 0b00000001) {
@@ -280,3 +360,237 @@ void CarAnalyzerDataClass::setSketchMD5(String sketchMD5) {
 void CarAnalyzerDataClass::setSketchSize(uint32_t sketchSize) {
     this->sketchSize = sketchSize;
 }
+
+void CarAnalyzerDataClass::setStateOfCharge(uint8_t stateOfCharge) {
+    this->stateOfCharge = stateOfCharge;
+}
+
+void CarAnalyzerDataClass::setRealStateOfCharge(uint8_t realStateOfCharge) {
+    this->realStateOfCharge = realStateOfCharge;
+}
+
+void CarAnalyzerDataClass::setStateOfHealth(uint8_t stateOfHealth) {
+    this->stateOfHealth = stateOfHealth;
+}
+
+void CarAnalyzerDataClass::setInletTemperature(uint8_t inletTemperature) {
+    this->inletTemperature = inletTemperature;
+}
+
+void CarAnalyzerDataClass::setBatteryTemperature(uint8_t batteryTemperature) {
+    this->batteryTemperature = batteryTemperature;
+}
+
+void CarAnalyzerDataClass::setBatteryCurrent(uint8_t batteryCurrent) {
+    this->batteryCurrent = batteryCurrent;
+}
+
+void CarAnalyzerDataClass::setAuxiliaryBattery(uint8_t auxiliaryBattery) {
+    this->auxiliaryBattery = auxiliaryBattery;
+}
+
+void CarAnalyzerDataClass::setCarSpeed(uint8_t carSpeed) {
+    this->carSpeed = carSpeed;
+}
+
+void CarAnalyzerDataClass::setIndoorTemperature(uint8_t indoorTemperature) {
+    this->indoorTemperature = indoorTemperature;
+}
+
+void CarAnalyzerDataClass::setOutdoorTemperature(uint8_t outdoorTemperature) {
+    this->outdoorTemperature = outdoorTemperature;
+}
+
+void CarAnalyzerDataClass::setOdometer(uint32_t odometer) {
+    this->odometer = odometer;
+}
+
+
+float CarAnalyzerDataClass::getLatitude(void) {
+    return this->latitude;
+}
+
+
+float CarAnalyzerDataClass::getLongitude(void) {
+    return this->longitude;
+}
+
+
+float CarAnalyzerDataClass::getSpeed(void) {
+    return this->speed;
+}
+
+
+float CarAnalyzerDataClass::getAltitude(void) {
+    return this->altitude;
+}
+
+
+int CarAnalyzerDataClass::getVisibleSat(void) {
+    return this->visibleSat;
+}
+
+
+int CarAnalyzerDataClass::getUsedSat(void) {
+    return this->usedSat;
+}
+
+
+float CarAnalyzerDataClass::getAccuracy(void) {
+    return this->accuracy;
+}
+
+
+long CarAnalyzerDataClass::getEpoch(void) {
+    return this->epoch;
+}
+
+
+
+String CarAnalyzerDataClass::getModemInfo(void) {
+    return this->modemInfo;
+}
+
+
+String CarAnalyzerDataClass::getModemName(void) {
+    return this->modemName;
+}
+
+
+int16_t CarAnalyzerDataClass::getSignalQuality(void) {
+    return this->signalQuality;
+}
+
+
+String CarAnalyzerDataClass::getLocalIP(void) {
+    return this->localIP;
+}
+
+
+String CarAnalyzerDataClass::getSimCCID(void) {
+    return this->simCCID;
+}
+
+
+String CarAnalyzerDataClass::getImei(void) {
+    return this->imei;
+}
+
+
+String CarAnalyzerDataClass::getImsi(void) {
+    return this->imsi;
+}
+
+
+int8_t CarAnalyzerDataClass::getSimStatus(void) {
+    return this->simStatus;
+}
+
+
+String CarAnalyzerDataClass::getGsmOperator(void) {
+    return this->gsmOperator;
+}
+
+
+int8_t CarAnalyzerDataClass::getRegistrationStatus(void) {
+    return this->registrationStatus;
+}
+
+uint32_t CarAnalyzerDataClass::getChipId(void) {
+    return this->chipId;
+}
+
+
+uint8_t CarAnalyzerDataClass::getChipRevision(void) {
+    return this->chipRevision;
+}
+
+
+uint32_t CarAnalyzerDataClass::getCpuFreqMHz(void) {
+    return this->cpuFreqMHz;
+}
+
+
+uint32_t CarAnalyzerDataClass::getFlashChipSize(void) {
+    return this->flashChipSize;
+}
+
+
+uint32_t CarAnalyzerDataClass::getFlashChipSpeed(void) {
+    return this->flashChipSpeed;
+}
+
+
+uint32_t CarAnalyzerDataClass::getFreeHeapSize(void) {
+    return this->freeHeapSize;
+}
+
+
+uint32_t CarAnalyzerDataClass::getFreePsramSize(void) {
+    return this->freePsramSize;
+}
+
+
+uint32_t CarAnalyzerDataClass::getHeapSize(void) {
+    return this->heapSize;
+}
+
+
+uint32_t CarAnalyzerDataClass::getPsramSize(void) {
+    return this->psramSize;
+}
+
+
+String CarAnalyzerDataClass::getSketchMD5(void) {
+    return this->sketchMD5;
+}
+
+
+uint32_t CarAnalyzerDataClass::getSketchSize(void) {
+    return this->sketchSize;
+}
+
+uint8_t CarAnalyzerDataClass::getStateOfCharge(void) {
+    return this->stateOfCharge;
+}
+
+uint8_t CarAnalyzerDataClass::getRealStateOfCharge(void) {
+    return this->realStateOfCharge;
+}
+
+uint8_t CarAnalyzerDataClass::getStateOfHealth(void) {
+    return this->stateOfHealth;
+}
+
+uint8_t CarAnalyzerDataClass::getInletTemperature(void) {
+    return this->inletTemperature;
+}
+
+uint8_t CarAnalyzerDataClass::getBatteryTemperature(void) {
+    return this->batteryTemperature;
+}
+
+uint8_t CarAnalyzerDataClass::getBatteryCurrent(void) {
+    return this->batteryCurrent;
+}
+
+uint8_t CarAnalyzerDataClass::getAuxiliaryBattery(void) {
+    return this->auxiliaryBattery;
+}
+
+uint8_t CarAnalyzerDataClass::getCarSpeed(void) {
+    return this->carSpeed;
+}
+
+uint8_t CarAnalyzerDataClass::getIndoorTemperature(void) {
+    return this->indoorTemperature;
+}
+
+uint8_t CarAnalyzerDataClass::getOutdoorTemperature(void) {
+    return this->outdoorTemperature;
+}
+
+uint32_t CarAnalyzerDataClass::getOdometer(void) {
+    return this->odometer;
+}
+

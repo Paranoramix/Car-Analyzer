@@ -7,6 +7,7 @@
 class CarAnalyzerDataClass {
     public:
         String getAllData(void);
+        String getAllDataCsv(void);
         String getChangedData(void);
 
         void setLatitude(float);
@@ -40,6 +41,62 @@ class CarAnalyzerDataClass {
         void setPsramSize(uint32_t);
         void setSketchMD5(String);
         void setSketchSize(uint32_t);
+
+        void setStateOfCharge(uint8_t);
+        void setRealStateOfCharge(uint8_t);
+        void setStateOfHealth(uint8_t);
+        void setInletTemperature(uint8_t);
+        void setBatteryTemperature(uint8_t);
+        void setBatteryCurrent(uint8_t);
+        void setAuxiliaryBattery(uint8_t);
+        void setCarSpeed(uint8_t);
+        void setIndoorTemperature(uint8_t);
+        void setOutdoorTemperature(uint8_t);
+        void setOdometer(uint32_t);
+
+        float getLatitude(void);
+        float getLongitude(void);
+        float getSpeed(void);
+        float getAltitude(void);
+        int getVisibleSat(void);
+        int getUsedSat(void);
+        float getAccuracy(void);
+        long getEpoch(void);
+
+        String getModemInfo(void);
+        String getModemName(void);
+        int16_t getSignalQuality(void);
+        String getLocalIP(void);
+        String getSimCCID(void);
+        String getImei(void);
+        String getImsi(void);
+        int8_t getSimStatus(void);
+        String getGsmOperator(void);
+        int8_t getRegistrationStatus(void);
+
+        uint32_t getChipId(void);
+        uint8_t getChipRevision(void);
+        uint32_t getCpuFreqMHz(void);
+        uint32_t getFlashChipSize(void);
+        uint32_t getFlashChipSpeed(void);
+        uint32_t getFreeHeapSize(void);
+        uint32_t getFreePsramSize(void);
+        uint32_t getHeapSize(void);
+        uint32_t getPsramSize(void);
+        String getSketchMD5(void);
+        uint32_t getSketchSize(void);
+
+        uint8_t getStateOfCharge(void);
+        uint8_t getRealStateOfCharge(void);
+        uint8_t getStateOfHealth(void);
+        uint8_t getInletTemperature(void);
+        uint8_t getBatteryTemperature(void);
+        uint8_t getBatteryCurrent(void);
+        uint8_t getAuxiliaryBattery(void);
+        uint8_t getCarSpeed(void);
+        uint8_t getIndoorTemperature(void);
+        uint8_t getOutdoorTemperature(void);
+        uint32_t getOdometer(void);
         
     private:
         // GPS informations
@@ -80,7 +137,20 @@ class CarAnalyzerDataClass {
         String      sketchMD5           = "";   // NO CHANGE
         uint32_t    sketchSize          = 0;    // NO CHANGE
 
-
+        // Car Informations
+        byte        carChange1          = 0;
+        byte        carChange2          = 0;
+        uint8_t     stateOfCharge       = 0;
+        uint8_t     realStateOfCharge   = 0;
+        uint8_t     stateOfHealth       = 0;
+        uint8_t     inletTemperature    = 0;
+        uint8_t     batteryTemperature  = 0;
+        uint8_t     batteryCurrent      = 0;
+        uint8_t     auxiliaryBattery    = 0;
+        uint8_t     carSpeed            = 0;
+        uint8_t     indoorTemperature   = 0;
+        uint8_t     outdoorTemperature  = 0;
+        uint32_t    odometer            = 0;
 };
 
 

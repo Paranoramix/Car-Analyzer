@@ -18,6 +18,7 @@ class CarAnalyzerSocketClass {
         AsyncWebServer *_server;
         AsyncWebSocket *_webSocket;
         String _name;
+        uint8_t _client;
 
 };
 
