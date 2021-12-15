@@ -6,7 +6,6 @@
 #include <ArduinoJson.h>
 #include <AsyncJson.h>
 #include <BluetoothSerial.h>
-#include <CircularBuffer.h>
 #include <ELMduino.h>
 #include <ESPAsyncWebServer.h>
 #include <ESP32Time.h>
@@ -20,7 +19,7 @@
 #define TINY_GSM_USE_GPRS true
 #define GSM_MODEM_RX 27
 #define GSM_MODEM_TX 25
-
+#define TINY_GSM_DEBUG Serial
 
 struct Config {
     bool gsmUse;
@@ -42,7 +41,7 @@ struct Config {
     bool bluetoothUse;
     char bluetoothName[40];
     char bluetoothPin[9];
-    char bluetoothAddress[40]; //dc:0d:30:a4:30
+    char bluetoothAddress[40]; //dc:0d:30:a4:3e:30
     uint8_t macAddress[6];
     bool logToFile;
 };
@@ -137,19 +136,12 @@ struct Timers {
     long bluetoothTimer;
     long memoryUsageTimer;
 };
-/*
-struct HistoricalData {
-    CircularBuffer<uint32_t, 86400>* heapMemory;
-    CircularBuffer<uint32_t, 86400>* psramMemory;
-};
-*/
+
 Config* config;
 GsmData* gsmData;
 GpsData* gpsData;
 BluetoothData* bluetoothData;
 CarData* carData;
-
-//HistoricalData* historicalData24h;
 
 Timers* updateTimers;
 
@@ -246,7 +238,7 @@ void loadConfiguration(const char *filename, Config &config) {
     strlcpy(config.bluetoothPin, doc["bluetoothPin"] | "1234",sizeof(config.bluetoothPin));
     CarAnalyzerLog_v("bluetoothPin: %s", config.bluetoothPin);
 
-    strlcpy(config.bluetoothAddress, doc["bluetoothAddress"] | "OBDII",sizeof(config.bluetoothAddress));
+    strlcpy(config.bluetoothAddress, doc["bluetoothAddress"] | "dc:0d:30:a4:3e:30",sizeof(config.bluetoothAddress));
     CarAnalyzerLog_v("bluetoothAddress: %s", config.bluetoothAddress);
     sscanf(config.bluetoothAddress, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &config.macAddress[0], &config.macAddress[1], &config.macAddress[2],&config.macAddress[3], &config.macAddress[4], &config.macAddress[5]);
 
@@ -330,10 +322,15 @@ void writeData(const char *filename, const char* data) {
         CarAnalyzerLog_e("  card formatting.");
     }
 
-    File file = SD.open(filename, FILE_WRITE);
-    file.print(data + '\n');
-    file.close();
+    char* d = (char*) ps_calloc(100, sizeof(char));
+    sprintf(d, "%ld,%s", gpsData->epoch, data);
 
+    File file = SD.open(filename, FILE_APPEND);
+    file.println(d);
+    file.close();
+    
+    free(d);
+    
     SD.end();
 }
 
@@ -604,6 +601,18 @@ void setup(void) {
             ESP.restart();
         });
 
+        server->on("/getData", HTTP_GET, [](AsyncWebServerRequest *request) {
+            if (!SD.begin()) {
+                    CarAnalyzerLog_e("SD.begin() failed. Check: ");
+                    CarAnalyzerLog_e("  card insertion,");
+                    CarAnalyzerLog_e("  SD shield I/O pins and chip select,");
+                    CarAnalyzerLog_e("  card formatting.");
+            }
+
+            request->send(SD, "/data_heap.csv", String(), true);
+
+            SD.end();
+        });
 
 
         server->onNotFound([](AsyncWebServerRequest *request) {
@@ -621,19 +630,21 @@ void setup(void) {
     if (config->bluetoothUse) {
         btSerial = new BluetoothSerial();
 
-        btSerial->begin(config->bluetoothName, true);
+        btSerial->begin("Car-Analyzer", true);
+        btSerial->disconnect();
+        btSerial->unpairDevice(config->macAddress);
         
         CarAnalyzerLog_d("After Bluetooth Initialization:");
         CarAnalyzerLog_d("Internal Total heap %u, internal Free Heap %u", ESP.getHeapSize(), ESP.getFreeHeap());
         CarAnalyzerLog_d("PSRam Total heap %u, PSRam Free Heap %u", ESP.getPsramSize(), ESP.getFreePsram());
         
-        btSerial->setPin("1234");
+        btSerial->setPin(config->bluetoothPin);
 
         if (!btSerial->connect(config->macAddress)) {
             CarAnalyzerLog_e("Connection to BT device failed.");
         } else {
             elm = new ELM327();
-            if (!elm->begin(*btSerial, false, 2000)) {
+            if (!elm->begin(*btSerial, true, 2000)) {
                 CarAnalyzerLog_e("ELM327 initializeation failed.");
             } else {
                 CarAnalyzerLog_d("After ELM327 Initialization success:");
@@ -739,12 +750,14 @@ void loop(void) {
             btSerial->end();
 
             btSerial->begin("Car-Analyzer", true);
+            btSerial->disconnect();
+            btSerial->unpairDevice(config->macAddress);
             
             CarAnalyzerLog_d("After Bluetooth Initialization:");
             CarAnalyzerLog_d("Internal Total heap %u, internal Free Heap %u", ESP.getHeapSize(), ESP.getFreeHeap());
             CarAnalyzerLog_d("PSRam Total heap %u, PSRam Free Heap %u", ESP.getPsramSize(), ESP.getFreePsram());
             
-            btSerial->setPin("1234");
+            btSerial->setPin(config->bluetoothPin);
             if (!btSerial->connect(config->macAddress)) {
                 CarAnalyzerLog_e("Connection to BT device failed.");
             } else {
@@ -769,33 +782,16 @@ void loop(void) {
         CarAnalyzerLog_d("ELM Connection status: %d", btSerial->connected());
 
     }
-/*
-    if (millis() - updateTimers->memoryUsageTimer > 1000) {
+
+    if (millis() - updateTimers->memoryUsageTimer > 5000) {
         updateTimers->memoryUsageTimer = millis();
 
-        CarAnalyzerLog_d("Before storing data in buffer:");
-
-        CarAnalyzerLog_d("Internal Total heap %u, internal Free Heap %u", ESP.getHeapSize(), ESP.getFreeHeap());
-        CarAnalyzerLog_d("PSRam Total heap %u, PSRam Free Heap %u", ESP.getPsramSize(), ESP.getFreePsram());
-
-        //historicalData24h->heapMemory->push(ESP.getFreeHeap());
-        //historicalData24h->psramMemory->push(ESP.getFreePsram());
-        
-
-        CarAnalyzerLog_d("After storing data in buffer:");
-
-        CarAnalyzerLog_d("Internal Total heap %u, internal Free Heap %u", ESP.getHeapSize(), ESP.getFreeHeap());
-        CarAnalyzerLog_d("PSRam Total heap %u, PSRam Free Heap %u", ESP.getPsramSize(), ESP.getFreePsram());
-
-        CarAnalyzerLog_d("Free Heap Memory:");
-        CarAnalyzerLog_d("Data stored count: %u", historicalData24h->heapMemory->size());
-        CarAnalyzerLog_d("Data stored last data: %u", historicalData24h->heapMemory->last());
-
-        CarAnalyzerLog_d("Free PSRam Memory:");
-        CarAnalyzerLog_d("Data stored count: %u", historicalData24h->psramMemory->size());
-        CarAnalyzerLog_d("Data stored last data: %u", historicalData24h->psramMemory->last());
+        writeData("/data_heap.csv", String(ESP.getFreeHeap()).c_str());
+        writeData("/data_psram.csv", String(ESP.getFreePsram()).c_str());
+        writeData("/bluetooth_state.csv", String(btSerial->connected()).c_str());
+    
 
     }
-*/
+
 }
 
