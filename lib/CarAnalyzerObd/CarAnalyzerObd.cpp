@@ -4,7 +4,7 @@
  * @brief Construct a new Car Analyzer Obd:: Car Analyzer Obd object.
  * 
  */
-CarAnalyzerObd::CarAnalyzerObd(void)
+CarAnalyzerObd::CarAnalyzerObd(uint8_t pinControl)
 {
     psramInit();
 
@@ -12,74 +12,56 @@ CarAnalyzerObd::CarAnalyzerObd(void)
     this->_btSerial = new BluetoothSerial();
     this->_elm = (ELM327 *)ps_malloc(sizeof(ELM327));
     this->_elm = new ELM327();
+    this->_lastUpdate = millis();
+
+    this->_data = new SpiRamJsonDocument(2000);
+
+    this->_configuration = new SpiRamJsonDocument(10000);
+
+    this->_elmPinControl = pinControl;
+
+    // Set pin as output.
+    pinMode(this->_elmPinControl, OUTPUT);
 }
 
 /**
  * @brief Initialize internal variables.
  * 
  * @param pinControl GPIO to switch ON/OFF the device.
- * @param statePin GPIO to detect if device is connected or not.
  * @param macAddress Mac Address to connect to the device.
  * @param pin Pin code to connect to the device.
  * @param name A name for bluetooth connection.
  */
-void CarAnalyzerObd::begin(uint8_t pinControl, uint8_t statePin, const char *macAddress, const char *pin = "1234", const char *name = "Car-Analyzer")
+bool CarAnalyzerObd::begin(const char *macAddress, const char *pin = "1234", const char *name = "Car-Analyzer")
 {
-    this->_elmPinControl = pinControl;
-    this->_elmPinState = statePin;
     this->_name = name;
     this->_pin = pin;
 
     sscanf(macAddress, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &this->_macAddress[0], &this->_macAddress[1], &this->_macAddress[2], &this->_macAddress[3], &this->_macAddress[4], &this->_macAddress[5]);
 
-    // Set pin as output.
-    pinMode(this->_elmPinControl, OUTPUT);
-    pinMode(this->_elmPinState, INPUT);
-
-    digitalWrite(this->_elmPinControl, HIGH);
-
-    this->_btSerial->begin(this->_name, true);
-
-    // We try to connect component.
-    if (!digitalRead(this->_elmPinState))
-    {
-        digitalWrite(this->_elmPinControl, LOW);
-        delay(100);
-        digitalWrite(this->_elmPinControl, HIGH);
-        delay(500);
-    }
-
-    return;
+    return this->switchOn() && this->_btSerial->begin(this->_name, true);
 }
 
 /**
  * @brief Turn on the device.
  * 
  */
-void CarAnalyzerObd::switchOn(void)
+bool CarAnalyzerObd::switchOn(void)
 {
-    if (!digitalRead(this->_elmPinState))
-    {
-        digitalWrite(this->_elmPinControl, LOW);
-        delay(100);
-        digitalWrite(this->_elmPinControl, HIGH);
-        delay(500);
-    }
+    digitalWrite(this->_elmPinControl, HIGH);
+
+    return digitalRead(this->_elmPinControl);
 }
 
 /**
  * @brief Turn off the device.
  * 
  */
-void CarAnalyzerObd::switchOff(void)
+bool CarAnalyzerObd::switchOff(void)
 {
-    if (digitalRead(this->_elmPinState))
-    {
-        digitalWrite(this->_elmPinControl, LOW);
-        delay(100);
-        digitalWrite(this->_elmPinControl, HIGH);
-        delay(500);
-    }
+    digitalWrite(this->_elmPinControl, LOW);
+
+    return digitalRead(this->_elmPinControl);
 }
 
 /**
@@ -108,7 +90,7 @@ bool CarAnalyzerObd::connect(void)
         }
         else
         {
-            if (!this->_elm->begin(*this->_btSerial, true, 5000, '6', 500))
+            if (!this->_elm->begin(*this->_btSerial, false, 1000, '6', 500))
             {
                 return false;
             }
@@ -131,7 +113,7 @@ bool CarAnalyzerObd::disconnect(void)
     this->_btSerial->disconnect();
     this->_btSerial->unpairDevice(this->_macAddress);
 
-    return !digitalRead(this->_elmPinState);
+    return !digitalRead(this->_elmPinControl);
 }
 
 void CarAnalyzerObd::end(void)
@@ -139,5 +121,214 @@ void CarAnalyzerObd::end(void)
     this->disconnect();
 
     this->_btSerial->end();
+}
 
+uint32_t CarAnalyzerObd::getLastUpdate(void)
+{
+    return this->_lastUpdate;
+}
+
+bool CarAnalyzerObd::loadConfiguration(JsonObject configuration)
+{
+    return this->_configuration->set(configuration);
+}
+
+bool CarAnalyzerObd::update(void)
+{
+    if (!this->_btSerial->connected())
+    {
+        return false;
+    }
+
+    CarAnalyzerLog_d("Updating Car OBD informations");
+
+    this->_lastUpdate = millis();
+
+    // A partir du fichier de configuration, nous allons extraire les données de l'OBD
+    for (JsonPair kv : this->_configuration->as<JsonObject>())
+    {
+        if (String(kv.key().c_str()).equals("CALCULATED"))
+        {
+            // On traite des données qui sont calculées, et qui ne sont pas retournées par l'OBD.
+            for (JsonPair parameter : kv.value().as<JsonObject>())
+            {
+                int nbVariables = (*this->_data)[parameter.value().as<JsonObject>()["nbVars"]].as<int>();
+                String formula = parameter.value().as<JsonObject>()["formula"].as<String>();
+
+                String homeAssistantSuffix = "";
+                if (parameter.value().as<JsonObject>().containsKey("HomeAssistantParameter"))
+                {
+                    homeAssistantSuffix = parameter.value().as<JsonObject>()["HomeAssistantParameter"].as<String>();
+                }
+
+                for (int i = 0; i < nbVariables; i++)
+                {
+                    double var = (*this->_data)[parameter.value().as<JsonObject>()["var" + String(i)]].as<double>();
+                    formula.replace("var" + String(i), String(var));
+                }
+
+                // Maintenant on lance le calcul
+                (*this->_data)[parameter.key().c_str() + homeAssistantSuffix] = te_interp(formula.c_str(), 0);
+            }
+        }
+        else
+        {
+            for (JsonPair kvc : kv.value().as<JsonObject>())
+            {
+                // Maintenant, on peut faire la requête auprès de l'ODB
+                if (this->readCarData(kv.key().c_str(), kvc.key().c_str(), 0))
+                {
+                    String data = String(this->_elm->payload);
+                    //String data = "";
+                    /*
+                if (String(kvc.key().c_str()).equals("220101"))
+                {
+                    data = "03E0:620101EFFBE71:EFB500000000002:00001D2A120C0E3:110D0E0D0036CF4:90CFA7000078005:008F5B00008C996:000064990000607:7D0050F67000008:06000000000BB8";
+                }
+
+                if (String(kvc.key().c_str()).equals("220105"))
+                {
+                    data = "02E0:620105FFFB741:0F012C01012C0D2:0C0D0F0E0E0E163:AD62D40000640E4:0003E84484F9005:C80000000000006:000F0E1012AAAA";
+                }
+
+                if (String(kvc.key().c_str()).equals("220106"))
+                {
+                    data = "0260:62010617F8111:000C000D0000002:000000000000003:0000000600EA004:000000000000005:00000000AAAAAA";
+                }
+
+                if (String(kvc.key().c_str()).equals("220100"))
+                {
+                    data = "0270:6201007F94071:C8FF71606201EF2:8E01EFFFFF0FFF3:B3FFFFFFFFFFFF4:FF3255796F00FF5:FF00FFFFFFAAAA";
+                }
+
+                if (String(kvc.key().c_str()).equals("22C00B"))
+                {
+                    data = "0240:62C00BFFFFFF1:80B638010000B42:37010000B639013:0000B7390100004:FF97B097B098B05:98B0AAAAAAAAAA";
+                }
+
+                if (String(kvc.key().c_str()).equals("22B002"))
+                {
+                    data = "00F0:62B002E000001:00FFAF0025E9002:0000AAAAAAAAAA";
+                }
+*/
+                    // On va nettoyer la chaine de caractères pour traiter les données.
+                    data.replace("0:", "");
+                    data.replace("1:", "");
+                    data.replace("2:", "");
+                    data.replace("3:", "");
+                    data.replace("4:", "");
+                    data.replace("5:", "");
+                    data.replace("6:", "");
+                    data.replace("7:", "");
+                    data.replace("8:", "");
+                    data.replace("SEARCHING", "");
+
+                    // La chaine est normalement nettoyée, on va pouvoir lancer le traitement des données.
+                    for (JsonPair parameter : kvc.value().as<JsonObject>())
+                    {
+                        // Et voilà, on analyse les clés fournies dans le paramètre, et on en déduit les traitements à réaliser.
+                        int startAt = parameter.value().as<JsonObject>()["start"].as<int>();
+                        int length = parameter.value().as<JsonObject>()["length"].as<int>();
+                        String formula = parameter.value().as<JsonObject>()["formula"].as<String>();
+                        String homeAssistantSuffix = "";
+                        if (parameter.value().as<JsonObject>().containsKey("HomeAssistantParameter"))
+                        {
+                            homeAssistantSuffix = parameter.value().as<JsonObject>()["HomeAssistantParameter"].as<String>();
+                        }
+
+                        double x;
+                        int err;
+
+                        te_variable vars[] = {{"x", &x}};
+                        te_expr *expr = te_compile(formula.c_str(), vars, 1, &err);
+
+                        x = this->extractCarData(data.c_str(), startAt, length);
+                        if (expr)
+                        {
+                            // Si la donnée a été calculée, alors on peut mettre à jour notre _data
+                            (*this->_data)[parameter.key().c_str() + homeAssistantSuffix] = te_eval(expr);
+                        }
+
+                        te_free(expr);
+                    }
+                } else {
+                    CarAnalyzerLog_w("Impossible to read data from OBD: %s, %s", kv.key().c_str(), kvc.key().c_str());
+                }
+            }
+        }
+    }
+    return true;
+}
+
+bool CarAnalyzerObd::readCarData(const char *header, const char *query, uint8_t lengthPayloadAttempted = 0)
+{
+
+    int8_t statusHeader = this->_elm->sendCommand(header);
+    if (statusHeader != ELM_SUCCESS)
+    {
+        CarAnalyzerLog_w("Error when sending header %s: %d", header, statusHeader);
+        return false;
+    }
+
+    delay(10);
+
+    int8_t statusQuery = this->_elm->sendCommand(query);
+    if (statusQuery != ELM_SUCCESS)
+    {
+        CarAnalyzerLog_w("Error when sending query %s: %d", query, statusQuery);
+
+        if (statusQuery == ELM_GENERAL_ERROR)
+        {
+            this->_btSerial->disconnect();
+        }
+
+        return false;
+    }
+
+    delay(500);
+
+    if (lengthPayloadAttempted > 0 && strlen(this->_elm->payload) != lengthPayloadAttempted)
+    {
+        CarAnalyzerLog_w("Payload Length error: %d (attempted: %d)", strlen(this->_elm->payload), lengthPayloadAttempted);
+
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * @brief Extrait une valeur depuis une trame récupérée par l'ODB.
+ * 
+ * @param source trame OBD2
+ * @param position position à partir de laquelle extraire la valeur.
+ * @param length  longueur de la valeur.
+ * @return long 
+ */
+double CarAnalyzerObd::extractCarData(const char *source, uint8_t position, uint8_t length)
+{
+    if (strlen(source) >= position + length + 1)
+    {
+        char *value = NULL;
+        char *endPtr;
+
+        value = (char *)ps_malloc((length + 1) * sizeof(char));
+
+        memcpy(value, &source[position], length);
+        value[length] = '\0';
+
+        long r = strtol(value, &endPtr, HEX);
+        ;
+        free(value);
+        return r;
+    }
+    else
+    {
+        return NAN;
+    }
+}
+
+JsonObject CarAnalyzerObd::getData(void)
+{
+    return (*this->_data).as<JsonObject>();
 }

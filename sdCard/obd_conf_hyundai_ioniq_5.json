@@ -1,0 +1,297 @@
+{
+    "AT SH 7E4": {
+        "220101": {
+            "SOCReal": {
+                "start": 17,
+                "length": 2,
+                "formula": "x/2",
+                "HomeAssistantParameter": "_battery_%"
+            },
+            "batteryCurrent": {
+                "start": 29,
+                "length": 4,
+                "formula": "(x-floor(x/51200)*65536)/10",
+                "HomeAssistantParameter": "_current_A"
+            },
+            "batteryVoltage": {
+                "start": 33,
+                "length": 4,
+                "formula": "x/10",
+                "HomeAssistantParameter": "_voltage_V"
+            },
+            "BatteryMaxTemperature": {
+                "start": 37,
+                "length": 2,
+                "formula": "(x-floor(x/128)*256)",
+                "HomeAssistantParameter": "_temperature_°C"
+            },
+            "BatteryMinTemperature": {
+                "start": 39,
+                "length": 2,
+                "formula": "(x-floor(x/128)*256)",
+                "HomeAssistantParameter": "_temperature_°C"
+            },
+            "BatteryTemperature1": {
+                "start": 41,
+                "length": 2,
+                "formula": "(x-floor(x/128)*256)",
+                "HomeAssistantParameter": "_temperature_°C"
+            },
+            "BatteryTemperature2": {
+                "start": 43,
+                "length": 2,
+                "formula": "(x-floor(x/128)*256)",
+                "HomeAssistantParameter": "_temperature_°C"
+            },
+            "BatteryTemperature3": {
+                "start": 45,
+                "length": 2,
+                "formula": "(x-floor(x/128)*256)",
+                "HomeAssistantParameter": "_temperature_°C"
+            },
+            "BatteryTemperature4": {
+                "start": 47,
+                "length": 2,
+                "formula": "(x-floor(x/128)*256)",
+                "HomeAssistantParameter": "_temperature_°C"
+            },
+            "BatteryTemperature5": {
+                "start": 49,
+                "length": 2,
+                "formula": "(x-floor(x/128)*256)",
+                "HomeAssistantParameter": "_temperature_°C"
+            },
+            "BatteryInTemperature": {
+                "start": 53,
+                "length": 2,
+                "formula": "(x-floor(x/128)*256)",
+                "HomeAssistantParameter": "_temperature_°C"
+            },
+            "MaxCellVoltage": {
+                "start": 55,
+                "length": 2,
+                "formula": "x/50",
+                "HomeAssistantParameter": "_voltage_V"
+            },
+            "MaxCellNumber": {
+                "start": 57,
+                "length": 2,
+                "formula": "x",
+                "HomeAssistantParameter": "__Cell"
+            },
+            "MinCellVoltage": {
+                "start": 59,
+                "length": 2,
+                "formula": "x/50",
+                "HomeAssistantParameter": "_voltage_V"
+            },
+            "MinCellNumber": {
+                "start": 61,
+                "length": 2,
+                "formula": "x",
+                "HomeAssistantParameter": "__Cell"
+            },
+            "BatteryFanSpeed": {
+                "start": 65,
+                "length": 2,
+                "formula": "x",
+                "HomeAssistantParameter": "__RPM"
+            },
+            "AuxBatteryVoltage": {
+                "start": 67,
+                "length": 2,
+                "formula": "x/10",
+                "HomeAssistantParameter": "_voltage_V"
+            },
+            "CCCValue": {
+                "start": 69,
+                "length": 8,
+                "formula": "x/10",
+                "HomeAssistantParameter": "_energy_kWh"
+            },
+            "CCDValue": {
+                "start": 77,
+                "length": 8,
+                "formula": "x/10",
+                "HomeAssistantParameter": "_energy_kWh"
+            },
+            "CECValue": {
+                "start": 85,
+                "length": 8,
+                "formula": "x/10",
+                "HomeAssistantParameter": "_current_A"
+            },
+            "CEDValue": {
+                "start": 93,
+                "length": 8,
+                "formula": "x/10",
+                "HomeAssistantParameter": "_current_A"
+            },
+            "OPTime": {
+                "start": 101,
+                "length": 8,
+                "formula": "x/3600",
+                "HomeAssistantParameter": "__h"
+            }
+        },
+        "220105": {
+            "MaxRegeneration": {
+                "start": 41,
+                "length": 4,
+                "formula": "x/100",
+                "HomeAssistantParameter": "_power_kW"
+            },
+            "MaxPower": {
+                "start": 45,
+                "length": 4,
+                "formula": "x/100",
+                "HomeAssistantParameter": "_power_kW"
+            },
+            "VoltageDifference": {
+                "start": 49,
+                "length": 2,
+                "formula": "x/2",
+                "HomeAssistantParameter": "_voltage_V"
+            },
+            "HeaterTemperature1": {
+                "start": 55,
+                "length": 2,
+                "formula": "(x-floor(x/128)*256)",
+                "HomeAssistantParameter": "_temperature_°C"
+            },
+            "SOH": {
+                "start": 59,
+                "length": 4,
+                "formula": "x/10",
+                "HomeAssistantParameter": "_battery_%"
+            },
+            "SOCDisplay": {
+                "start": 71,
+                "length": 2,
+                "formula": "x/2",
+                "HomeAssistantParameter": "_battery_%"
+            }
+        },
+        "220106": {
+            "WaterCoolingTemp": {
+                "start": 17,
+                "length": 2,
+                "formula": "(x-floor(x/128)*256)",
+                "HomeAssistantParameter": "_temperature_°C"
+            }
+        }
+
+    },
+    "AT SH 7E2": {
+        "2101": {
+            "TransmissionSelected": {
+                "start": 17,
+                "length": 2,
+                "formula": "x",
+                "HomeAssistantParameter": "__"
+            }
+        },
+        "2102": {
+            "AuxBatteryCurrent": {
+                "start": 49,
+                "length": 4,
+                "formula": "(x-floor(x/128)*256)/10",
+                "HomeAssistantParameter": "_current_A"
+            },
+            "AuxBatterySOC": {
+                "start": 53,
+                "length": 2,
+                "formula": "x/100",
+                "HomeAssistantParameter": "_battery_%"
+            }
+        }
+    },
+    "AT SH 7C6": {
+        "22B002": {
+            "Odometer": {
+                "start": 21,
+                "length": 6,
+                "formula": "x",
+                "HomeAssistantParameter": "__km"
+            }
+        }
+    },
+    "AT SH 7B3": {
+        "220100": {
+            "IndoorTemperature": {
+                "start": 19,
+                "length": 2,
+                "formula": "(x/2)-40",
+                "HomeAssistantParameter": "_temperature_°C"
+            },
+            "OutdoorTemperature": {
+                "start": 21,
+                "length": 2,
+                "formula": "(x/2)-40",
+                "HomeAssistantParameter": "_temperature_°C"
+            }
+        }
+    },
+    "AT SH 7A0": {
+        "22C00B": {
+            "TireFrontLeftPressure": {
+                "start": 17,
+                "length": 2,
+                "formula": "x/5/14.504",
+                "HomeAssistantParameter": "_pressure_bar"
+            },
+            "TireFrontLeftTemperature": {
+                "start": 19,
+                "length": 2,
+                "formula": "x-50",
+                "HomeAssistantParameter": "_temperature_°C"
+            },
+            "TireFrontRightPressure": {
+                "start": 27,
+                "length": 2,
+                "formula": "x/5/14.504",
+                "HomeAssistantParameter": "_pressure_bar"
+            },
+            "TireFrontRightTemperature": {
+                "start": 29,
+                "length": 2,
+                "formula": "x-50",
+                "HomeAssistantParameter": "_temperature_°C"
+            },
+            "TireRearRightPressure": {
+                "start": 37,
+                "length": 2,
+                "formula": "x/5/14.504",
+                "HomeAssistantParameter": "_pressure_bar"
+            },
+            "TireRearRightTemperature": {
+                "start": 39,
+                "length": 2,
+                "formula": "x-50",
+                "HomeAssistantParameter": "_temperature_°C"
+            },
+            "TireRearLeftPressure": {
+                "start": 47,
+                "length": 2,
+                "formula": "x/5/14.504",
+                "HomeAssistantParameter": "_pressure_bar"
+            },
+            "TireRearLeftTemperature": {
+                "start": 49,
+                "length": 2,
+                "formula": "x-50",
+                "HomeAssistantParameter": "_temperature_°C"
+            }
+        }
+    },
+    "CALCULATED": {
+        "BatteryPower": {
+            "nbVars": 2,
+            "var1": "batteryCurrent_current_A",
+            "var2": "batteryVoltage_voltage_V",
+            "formula": "x*y*0.001",
+            "HomeAssistantParameter": "_power_kW"
+        }
+    }
+
+}

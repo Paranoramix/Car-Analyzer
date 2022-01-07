@@ -1,4 +1,11 @@
+
+#ifndef ARDUINOJSON_USE_LONG_LONG
+#define ARDUINOJSON_USE_LONG_LONG 1
+#endif
+
+
 #include <ArduinoJson.h>
+
 
 #ifndef _ARDUINO_JSON_SPI_RAM_ALLOCATOR
 #define _ARDUINO_JSON_SPI_RAM_ALLOCATOR
