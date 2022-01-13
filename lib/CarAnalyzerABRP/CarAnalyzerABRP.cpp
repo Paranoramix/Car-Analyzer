@@ -25,7 +25,6 @@ void CarAnalyzerABRP::begin(const char *abrpApiKey, const char *abrpToken, const
     strcpy(this->_abrpToken, abrpToken);
     strcpy(this->_abrpCarModel, abrpCarModel);
     CarAnalyzerLog_d("ABRP parameters initiialized: apiKey=%s, token=%s, carModel=%s", this->_abrpApiKey, this->_abrpToken, this->_abrpCarModel);
-
 }
 
 boolean CarAnalyzerABRP::publish(JsonObject gpsJson, JsonObject carJson)
@@ -36,17 +35,39 @@ boolean CarAnalyzerABRP::publish(JsonObject gpsJson, JsonObject carJson)
 
     if (!carJson.isNull())
     {
-        doc["soc"] = carJson["SOCDisplay_battery_%"];
-        doc["soh"] = carJson["SOH_battery_%"];
+
+        if (gpsJson.containsKey("SOCDisplay_battery_%"))
+        {
+            doc["soc"] = carJson["SOCDisplay_battery_%"];
+        }
+        if (gpsJson.containsKey("SOH_battery_%"))
+        {
+            doc["soh"] = carJson["SOH_battery_%"];
+        }
     }
 
     if (!gpsJson.isNull() && gpsJson["valid"])
     {
-        doc["utc"] = gpsJson["epoch"];
-        doc["speed"] = gpsJson["speed__km/h"];
-        doc["lat"] = gpsJson["latitude__°"];
-        doc["lon"] = gpsJson["longitude__°"];
-        doc["elevation"] = gpsJson["altitude__m"];
+        if (gpsJson.containsKey("epoch"))
+        {
+            doc["utc"] = gpsJson["epoch"];
+        }
+        if (gpsJson.containsKey("speed__km"))
+        {
+            doc["speed"] = gpsJson["speed__km/h"];
+        }
+        if (gpsJson.containsKey("latitude__°"))
+        {
+            doc["lat"] = gpsJson["latitude__°"];
+        }
+        if (gpsJson.containsKey("longitude__°"))
+        {
+            doc["lon"] = gpsJson["longitude__°"];
+        }
+        if (gpsJson.containsKey("altitude__m"))
+        {
+            doc["elevation"] = gpsJson["altitude__m"];
+        }
     }
 
     if (!doc.isNull())

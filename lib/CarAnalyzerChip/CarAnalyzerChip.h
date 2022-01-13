@@ -13,10 +13,11 @@ class CarAnalyzerChip {
     SpiRamJsonDocument *_data;
 
     uint8_t _batteryVoltagePin;
+    uint8_t _alimVoltagePin;
     unsigned long _lastUpdate;
 
     public:
-        CarAnalyzerChip(uint8_t);
+        CarAnalyzerChip(uint8_t, uint8_t);
 
         boolean update(void);
 

@@ -14,9 +14,10 @@ CarAnalyzerObd::CarAnalyzerObd(uint8_t pinControl)
     this->_elm = new ELM327();
     this->_lastUpdate = millis();
 
-    this->_data = new SpiRamJsonDocument(2000);
+    this->_data = new SpiRamJsonDocument(10000);
+    this->_dataRaw = new SpiRamJsonDocument(10000);
 
-    this->_configuration = new SpiRamJsonDocument(10000);
+    this->_configuration = new SpiRamJsonDocument(50000);
 
     this->_elmPinControl = pinControl;
 
@@ -130,17 +131,23 @@ uint32_t CarAnalyzerObd::getLastUpdate(void)
 
 bool CarAnalyzerObd::loadConfiguration(JsonObject configuration)
 {
+    String r;
+    serializeJsonPretty(configuration, r);
+    CarAnalyzerLog_d("%s", r.c_str());
     return this->_configuration->set(configuration);
 }
 
 bool CarAnalyzerObd::update(void)
 {
+    this->_data->clear();
+    this->_dataRaw->clear();
+
     if (!this->_btSerial->connected())
     {
         return false;
     }
 
-    CarAnalyzerLog_d("Updating Car OBD informations");
+    CarAnalyzerLog_v("Updating Car OBD informations");
 
     this->_lastUpdate = millis();
 
@@ -152,8 +159,10 @@ bool CarAnalyzerObd::update(void)
             // On traite des données qui sont calculées, et qui ne sont pas retournées par l'OBD.
             for (JsonPair parameter : kv.value().as<JsonObject>())
             {
-                int nbVariables = (*this->_data)[parameter.value().as<JsonObject>()["nbVars"]].as<int>();
                 String formula = parameter.value().as<JsonObject>()["formula"].as<String>();
+                JsonArray vars = parameter.value().as<JsonObject>()["vars"].as<JsonArray>();
+
+                CarAnalyzerLog_d("Calcul %s: %s", parameter.key().c_str(), formula.c_str());
 
                 String homeAssistantSuffix = "";
                 if (parameter.value().as<JsonObject>().containsKey("HomeAssistantParameter"))
@@ -161,14 +170,24 @@ bool CarAnalyzerObd::update(void)
                     homeAssistantSuffix = parameter.value().as<JsonObject>()["HomeAssistantParameter"].as<String>();
                 }
 
-                for (int i = 0; i < nbVariables; i++)
+                for (JsonVariant value : vars)
                 {
-                    double var = (*this->_data)[parameter.value().as<JsonObject>()["var" + String(i)]].as<double>();
-                    formula.replace("var" + String(i), String(var));
+                    if (this->_data->containsKey(value.as<String>()))
+                    {
+                        formula.replace(value.as<String>(), String((*this->_data)[value.as<String>()].as<double>()));
+                    }
                 }
 
+                CarAnalyzerLog_d("Calcul: %s", formula.c_str());
+
                 // Maintenant on lance le calcul
-                (*this->_data)[parameter.key().c_str() + homeAssistantSuffix] = te_interp(formula.c_str(), 0);
+                int err;
+                double result = te_interp(formula.c_str(), &err);
+
+                if (err == 0)
+                {
+                    (*this->_data)[parameter.key().c_str() + homeAssistantSuffix] = result;
+                }
             }
         }
         else
@@ -176,41 +195,44 @@ bool CarAnalyzerObd::update(void)
             for (JsonPair kvc : kv.value().as<JsonObject>())
             {
                 // Maintenant, on peut faire la requête auprès de l'ODB
-                if (this->readCarData(kv.key().c_str(), kvc.key().c_str(), 0))
+                //               if (this->readCarData(kv.key().c_str(), kvc.key().c_str(), 0))
                 {
-                    String data = String(this->_elm->payload);
-                    //String data = "";
-                    /*
-                if (String(kvc.key().c_str()).equals("220101"))
-                {
-                    data = "03E0:620101EFFBE71:EFB500000000002:00001D2A120C0E3:110D0E0D0036CF4:90CFA7000078005:008F5B00008C996:000064990000607:7D0050F67000008:06000000000BB8";
-                }
+                    //                    String data = String(this->_elm->payload);
 
-                if (String(kvc.key().c_str()).equals("220105"))
-                {
-                    data = "02E0:620105FFFB741:0F012C01012C0D2:0C0D0F0E0E0E163:AD62D40000640E4:0003E84484F9005:C80000000000006:000F0E1012AAAA";
-                }
+                    String data = "";
 
-                if (String(kvc.key().c_str()).equals("220106"))
-                {
-                    data = "0260:62010617F8111:000C000D0000002:000000000000003:0000000600EA004:000000000000005:00000000AAAAAA";
-                }
+                    if (String(kvc.key().c_str()).equals("220101"))
+                    {
+                        data = "03E0:620101EFFBE71:EFB500000000002:FF9D1D2A120C0E3:110D0E0D0036CF4:90CFA7000078005:008F5B00008C996:000064990000607:7D0050F67000008:06000000000BB8";
+                    }
 
-                if (String(kvc.key().c_str()).equals("220100"))
-                {
-                    data = "0270:6201007F94071:C8FF71606201EF2:8E01EFFFFF0FFF3:B3FFFFFFFFFFFF4:FF3255796F00FF5:FF00FFFFFFAAAA";
-                }
+                    if (String(kvc.key().c_str()).equals("220105"))
+                    {
+                        data = "02E0:620105FFFB741:0F012C01012C0D2:0C0D0F0E0E0E163:AD62D40000640E4:0003E84484F9005:C80000000000006:000F0E1012AAAA";
+                    }
 
-                if (String(kvc.key().c_str()).equals("22C00B"))
-                {
-                    data = "0240:62C00BFFFFFF1:80B638010000B42:37010000B639013:0000B7390100004:FF97B097B098B05:98B0AAAAAAAAAA";
-                }
+                    if (String(kvc.key().c_str()).equals("220106"))
+                    {
+                        data = "0260:62010617F8111:000C000D0000002:000000000000003:0000000600EA004:000000000000005:00000000AAAAAA";
+                    }
 
-                if (String(kvc.key().c_str()).equals("22B002"))
-                {
-                    data = "00F0:62B002E000001:00FFAF0025E9002:0000AAAAAAAAAA";
-                }
-*/
+                    if (String(kvc.key().c_str()).equals("220100"))
+                    {
+                        data = "0270:6201007F94071:C8FF71606201EF2:8E01EFFFFF0FFF3:B3FFFFFFFFFFFF4:FF3255796F00FF5:FF00FFFFFFAAAA";
+                    }
+
+                    if (String(kvc.key().c_str()).equals("22C00B"))
+                    {
+                        data = "0240:62C00BFFFFFF1:80B638010000B42:37010000B639013:0000B7390100004:FF97B097B098B05:98B0AAAAAAAAAA";
+                    }
+
+                    if (String(kvc.key().c_str()).equals("22B002"))
+                    {
+                        data = "00F0:62B002E000001:00FFAF0025E9002:0000AAAAAAAAAA";
+                    }
+
+                    (*this->_dataRaw)[kvc.key().c_str()] = data;
+
                     // On va nettoyer la chaine de caractères pour traiter les données.
                     data.replace("0:", "");
                     data.replace("1:", "");
@@ -251,7 +273,7 @@ bool CarAnalyzerObd::update(void)
 
                         te_free(expr);
                     }
-                } else {
+                    //                } else {
                     CarAnalyzerLog_w("Impossible to read data from OBD: %s, %s", kv.key().c_str(), kvc.key().c_str());
                 }
             }
@@ -331,4 +353,9 @@ double CarAnalyzerObd::extractCarData(const char *source, uint8_t position, uint
 JsonObject CarAnalyzerObd::getData(void)
 {
     return (*this->_data).as<JsonObject>();
+}
+
+JsonObject CarAnalyzerObd::getDataRaw(void)
+{
+    return (*this->_dataRaw).as<JsonObject>();
 }

@@ -31,7 +31,7 @@ CarAnalyzerGsm::CarAnalyzerGsm(uint8_t powerPin, uint8_t flightPin)
     this->_abrpGsmClient = (TinyGsmClient *)ps_malloc(sizeof(TinyGsmClient));
     this->_homeAssistantGsmClient = (TinyGsmClient *)ps_malloc(sizeof(TinyGsmClient));
 
-    this->_data = new SpiRamJsonDocument(1000);
+    this->_data = new SpiRamJsonDocument(2000);
 
     this->_lastUpdate = millis();
 
@@ -61,6 +61,22 @@ void CarAnalyzerGsm::begin(uint32_t baud, uint8_t rxPin, uint8_t txPin)
     this->_homeAssistantGsmClient = new TinyGsmClient(*this->_gsmModem, 2);
 }
 
+void CarAnalyzerGsm::reconnect(void) {
+    this->connect(this->_pin, this->_apn, this->_username, this->_password);
+}
+
+void CarAnalyzerGsm::reset(void) {
+    if (this->_abrpGsmClient->connected()) {
+        this->_abrpGsmClient->stop();
+    }
+
+    if (this->_homeAssistantGsmClient->connected()) {
+        this->_homeAssistantGsmClient->stop();
+    }
+    
+    this->_gsmModem->init(this->_pin);
+}
+
 /**
  * @brief Connect to GPRS.
  * 
@@ -82,11 +98,13 @@ bool CarAnalyzerGsm::connect(const char *pin, const char *apn, const char *user,
     CarAnalyzerLog_d("Modem Info: %d", this->_gsmModem->getModemInfo().c_str());
     CarAnalyzerLog_d("GSM connection");
 
-    if (!this->_gsmModem->init(pin))
+    this->reset();
+
+    if (!this->_gsmModem->init(this->_pin))
     {
-        if (!this->_gsmModem->restart(pin))
+        if (!this->_gsmModem->restart(this->_pin))
         {
-            CarAnalyzerLog_e("GSM cannot be restarted... [%s]", pin);
+            CarAnalyzerLog_e("GSM cannot be restarted... [%s]", this->_pin);
             return false;
         }
 
@@ -102,42 +120,43 @@ bool CarAnalyzerGsm::connect(const char *pin, const char *apn, const char *user,
 
     if (this->_gsmModem->getSimStatus() != 1 && this->_gsmModem->getSimStatus() != 3)
     {
-        if (!this->_gsmModem->simUnlock(pin))
+        if (!this->_gsmModem->simUnlock(this->_pin))
         {
-            CarAnalyzerLog_e("GSM cannot be sim unlocked... [%s]", pin);
+            CarAnalyzerLog_e("GSM cannot be sim unlocked... [%s]", this->_pin);
             return false;
         }
     }
 
     if (!this->_gsmModem->isGprsConnected())
     {
-        if (!this->_gsmModem->gprsConnect(apn, user, password))
+        if (!this->_gsmModem->gprsConnect(this->_apn, this->_username, this->_password))
         {
-            CarAnalyzerLog_e("GSM cannot be connect GPRS... [%s]", pin);
+            CarAnalyzerLog_e("GSM cannot be connect GPRS... [%s]", this->_pin);
             return false;
         }
     }
 
-    CarAnalyzerLog_d("GPRS status: %d", this->_gsmModem->isGprsConnected());
-    CarAnalyzerLog_d("CCID: %s", this->_gsmModem->getSimCCID().c_str());
-    CarAnalyzerLog_d("IMEI: %s", this->_gsmModem->getIMEI().c_str());
-    CarAnalyzerLog_d("IMSI: %s", this->_gsmModem->getIMSI().c_str());
-    CarAnalyzerLog_d("Operator: %s", this->_gsmModem->getOperator().c_str());
-    CarAnalyzerLog_d("local IP: %s", this->_gsmModem->getLocalIP().c_str());
-    CarAnalyzerLog_d("Signal Quality: %d", this->_gsmModem->getSignalQuality());
+    CarAnalyzerLog_v("GPRS status: %d", this->_gsmModem->isGprsConnected());
+    CarAnalyzerLog_v("CCID: %s", this->_gsmModem->getSimCCID().c_str());
+    CarAnalyzerLog_v("IMEI: %s", this->_gsmModem->getIMEI().c_str());
+    CarAnalyzerLog_v("IMSI: %s", this->_gsmModem->getIMSI().c_str());
+    CarAnalyzerLog_v("Operator: %s", this->_gsmModem->getOperator().c_str());
+    CarAnalyzerLog_v("local IP: %s", this->_gsmModem->getLocalIP().c_str());
+    CarAnalyzerLog_v("Signal Quality: %d", this->_gsmModem->getSignalQuality());
+
+    this->_abrpGsmClient->init(this->_gsmModem, 1);
+    this->_homeAssistantGsmClient->init(this->_gsmModem, 2);
 
     return this->_gsmModem->isGprsConnected();
 }
 
 void CarAnalyzerGsm::update(void)
 {
-    CarAnalyzerLog_d("Updating GSM informations");
+    CarAnalyzerLog_v("Updating GSM informations");
 
     this->_data->clear();
-    
-    this->_lastUpdate = millis();
 
-    this->connect(this->_pin, this->_apn, this->_username, this->_password);
+    this->_lastUpdate = millis();
 
     if (this->_gsmModem->isGprsConnected())
     {
@@ -177,7 +196,7 @@ void CarAnalyzerGsm::update(void)
         {
             (*this->_data)["signalQualityCondition"] = "Excellent";
         }
-        else 
+        else
         {
             (*this->_data)["signalQualityCondition"] = "Ideal";
         }
@@ -196,17 +215,50 @@ void CarAnalyzerGsm::update(void)
         (*this->_data)["network"] = "off";
     }
 
-    CarAnalyzerLog_d("GPRS: %d", this->_gsmModem->isGprsConnected());
-    CarAnalyzerLog_d("ccid: %s", this->_gsmModem->getSimCCID().c_str());
-    CarAnalyzerLog_d("imei: %s", this->_gsmModem->getIMEI().c_str());
-    CarAnalyzerLog_d("imsi: %s", this->_gsmModem->getIMSI().c_str());
-    CarAnalyzerLog_d("operator: %s", this->_gsmModem->getOperator().c_str());
-    CarAnalyzerLog_d("localIP: %s", this->_gsmModem->getLocalIP().c_str());
-    CarAnalyzerLog_d("signalQuality: %ld", this->_gsmModem->getSignalQuality());
-    CarAnalyzerLog_d("registrationStatus: %d", this->_gsmModem->getRegistrationStatus());
-    CarAnalyzerLog_d("temperature: %f", this->_gsmModem->getTemperature());
-    CarAnalyzerLog_d("simStatus: %d", this->_gsmModem->getSimStatus());
-    CarAnalyzerLog_d("network: %d", this->_gsmModem->isNetworkConnected());
+    double gsmVoltage = 0;
+
+    for (int i = 0 ; i < 100 ; i++) {
+        gsmVoltage += this->_gsmModem->getBattVoltage();
+    }
+
+    gsmVoltage = gsmVoltage / 100.0;
+
+    (*this->_data)["GsmBattVoltage_voltage_V"] = gsmVoltage / 1000.0;
+
+    if (gsmVoltage >= 4000)
+    {
+        (*this->_data)["GsmBattPercent_battery_%"] = 100;
+    }
+    else if (gsmVoltage >= 3800)
+    {
+        (*this->_data)["GsmBattPercent_battery_%"] = 75;
+    }
+    else if (gsmVoltage >= 3600)
+    {
+        (*this->_data)["GsmBattPercent_battery_%"] = 50;
+    }
+    else if (gsmVoltage >= 3400)
+    {
+        (*this->_data)["GsmBattPercent_battery_%"] = 25;
+    }
+    else if (gsmVoltage < 3400)
+    {
+        (*this->_data)["GsmBattPercent_battery_%"] = 0;
+    }
+
+    CarAnalyzerLog_v("Battery Voltage: %f", (gsmVoltage / 1000.0));
+
+    CarAnalyzerLog_v("GPRS: %d", this->_gsmModem->isGprsConnected());
+    CarAnalyzerLog_v("ccid: %s", this->_gsmModem->getSimCCID().c_str());
+    CarAnalyzerLog_v("imei: %s", this->_gsmModem->getIMEI().c_str());
+    CarAnalyzerLog_v("imsi: %s", this->_gsmModem->getIMSI().c_str());
+    CarAnalyzerLog_v("operator: %s", this->_gsmModem->getOperator().c_str());
+    CarAnalyzerLog_v("localIP: %s", this->_gsmModem->getLocalIP().c_str());
+    CarAnalyzerLog_v("signalQuality: %ld", this->_gsmModem->getSignalQuality());
+    CarAnalyzerLog_v("registrationStatus: %d", this->_gsmModem->getRegistrationStatus());
+    CarAnalyzerLog_v("temperature: %f", this->_gsmModem->getTemperature());
+    CarAnalyzerLog_v("simStatus: %d", this->_gsmModem->getSimStatus());
+    CarAnalyzerLog_v("network: %d", this->_gsmModem->isNetworkConnected());
 
     return;
 }
@@ -231,9 +283,10 @@ uint32_t CarAnalyzerGsm::getLastUpdate(void)
     return this->_lastUpdate;
 }
 
-void CarAnalyzerGsm::powerOff(void) {
+void CarAnalyzerGsm::powerOff(void)
+{
     this->_gsmModem->poweroff();
-    
+
     esp_sleep_enable_timer_wakeup(5 * 1000000ULL);
     esp_light_sleep_start();
 }

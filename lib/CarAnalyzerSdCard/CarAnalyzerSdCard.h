@@ -6,6 +6,8 @@
 #include <ArduinoJson.h>
 #include <SD.h>
 #include <SPI.h>
+#include <Update.h>
+
 
 #include "../../include/CarAnalyzerLog.h"
 
@@ -23,6 +25,9 @@ public:
     JsonObject readJsonFile(const char*);
 
     bool saveFile(JsonObject, const char*, bool);
+    bool updateFile(JsonObject, const char*, const char*, bool);
+
+    void checkForUpdate(void);
 
     uint32_t getLastUpdate(void);
 };

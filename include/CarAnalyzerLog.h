@@ -34,7 +34,7 @@ extern "C"
 	int log_printf(const char *fmt, ...);
 
 #define CAR_ANALYZER_SHORT_LOG_FORMAT(letter, format) CAR_ANALYZER_LOG_COLOR_##letter format CAR_ANALYZER_LOG_RESET_COLOR "\r\n"
-#define CAR_ANALYZER_LOG_FORMAT(letter, format) CAR_ANALYZER_LOG_COLOR_##letter "[" #letter "][%s:%u] %s(): " format CAR_ANALYZER_LOG_RESET_COLOR "\r\n", pathToFileName(__FILE__), __LINE__, __FUNCTION__
+#define CAR_ANALYZER_LOG_FORMAT(letter, format) CAR_ANALYZER_LOG_COLOR_##letter "[" #letter "][%lu][%s:%u] %s(): " format CAR_ANALYZER_LOG_RESET_COLOR "\r\n", millis(), pathToFileName(__FILE__), __LINE__, __FUNCTION__
 
 #if CAR_ANALYZER_LOG_LEVEL >= CAR_ANALYZER_LOG_LEVEL_VERBOSE
 #define CarAnalyzerLog_v(format, ...) log_printf(CAR_ANALYZER_LOG_FORMAT(V, format), ##__VA_ARGS__)

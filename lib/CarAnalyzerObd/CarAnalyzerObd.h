@@ -29,6 +29,7 @@ private:
 
     SpiRamJsonDocument *_configuration;
     SpiRamJsonDocument* _data;
+    SpiRamJsonDocument* _dataRaw;
 
     double extractCarData(const char *, uint8_t, uint8_t );
 
@@ -59,6 +60,7 @@ public:
      * @return JsonObject 
      */
     JsonObject getData(void);
+    JsonObject getDataRaw(void);
 
 };
 

@@ -1,20 +1,23 @@
 #include "CarAnalyzerChip.h"
 
-CarAnalyzerChip::CarAnalyzerChip(uint8_t batteryVoltagePin)
+CarAnalyzerChip::CarAnalyzerChip(uint8_t batteryVoltagePin, uint8_t alimVoltagePin)
 {
     psramInit();
     this->_data = new SpiRamJsonDocument(1000);
 
     this->_lastUpdate = millis();
     this->_batteryVoltagePin = batteryVoltagePin;
+    this->_alimVoltagePin = alimVoltagePin;
 
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
+
+    pinMode(this->_batteryVoltagePin, INPUT);
+    pinMode(this->_alimVoltagePin, INPUT);
 }
 
 boolean CarAnalyzerChip::update(void)
 {
-    CarAnalyzerLog_d("Updating Chip informations");
     this->_data->clear();
     
     uint32_t chipId = 0;
@@ -26,23 +29,30 @@ boolean CarAnalyzerChip::update(void)
     String chip = String(chipId, HEX);
     chip.toUpperCase();
 
-    uint16_t batteryVoltage = analogRead(this->_batteryVoltagePin);
+    double batteryVoltage = 0;
+    double alimVoltage = 0;
+    for (int i = 0 ; i < 100 ; i++) {
+        batteryVoltage += analogRead(this->_batteryVoltagePin);
+        alimVoltage += analogRead(this->_alimVoltagePin);
+    }
 
-    if (batteryVoltage == 0)
+    batteryVoltage = batteryVoltage / 100;
+    alimVoltage = alimVoltage / 100;
+
+    if (alimVoltage > 0)
     {
         digitalWrite(LED_PIN, LOW);
 
         (*this->_data)["powerSupply"] = "External";
-        (*this->_data)["battery_battery_%"] = 100;
-        (*this->_data)["voltage_voltage_V"] = 5;
     }
     else
     {
         digitalWrite(LED_PIN, HIGH);
         (*this->_data)["powerSupply"] = "Battery";
-        (*this->_data)["battery_battery_%"] = 100 * (2 * batteryVoltage - 3500) / 1300;
-        (*this->_data)["voltage_voltage_V"] = 2 * batteryVoltage / 1000.0;
     }
+
+    (*this->_data)["chipExternalVoltage_voltage_V"] = (float)(2 * alimVoltage / 1000.0);
+    (*this->_data)["chipBatteryVoltage_voltage_V"] = (float)(2 * batteryVoltage / 1000.0);
 
     (*this->_data)["id"] = chip;
     (*this->_data)["cores"] = ESP.getChipCores();
@@ -82,7 +92,7 @@ unsigned long CarAnalyzerChip::getLastUpdate(void)
 
 bool CarAnalyzerChip::isBatteryPowered(void)
 {
-    if (analogRead(this->_batteryVoltagePin) == 0)
+    if (analogRead(this->_alimVoltagePin) > 0)
     {
         return false;
     }

@@ -50,6 +50,8 @@ public:
     bool disconnect(void);
     void update(void);
 
+    void reconnect(void);
+    void reset(void);
     void powerOff(void);
 
     TinyGsmClient *getHomeAssistantClient(void);

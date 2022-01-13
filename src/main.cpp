@@ -2,24 +2,21 @@
 //#define DUMP_AT_COMMANDS
 
 #include <Arduino.h>
-#include <WiFi.h>
-
-#include "CarAnalyzerConstants.h"
 
 #include "CarAnalyzerArduinoJson.h"
-
-#include "CarAnalyzerLog.h"
+#include "CarAnalyzerConstants.h"
 #include "CarAnalyzerData.h"
+#include "CarAnalyzerLog.h"
+#include "CarAnalyzerVersion.h"
 
-#include "CarAnalyzerConfig.h"
-
-#include "CarAnalyzerChip.h"
-#include "CarAnalyzerSdCard.h"
-#include "CarAnalyzerObd.h"
-#include "CarAnalyzerGsm.h"
-#include "CarAnalyzerGps.h"
-#include "CarAnalyzerHomeAssistant.h"
 #include "CarAnalyzerABRP.h"
+#include "CarAnalyzerChip.h"
+#include "CarAnalyzerConfig.h"
+#include "CarAnalyzerGps.h"
+#include "CarAnalyzerGsm.h"
+#include "CarAnalyzerHomeAssistant.h"
+#include "CarAnalyzerObd.h"
+#include "CarAnalyzerSdCard.h"
 
 CarAnalyzerConfig *carAnalyzerConfig;
 CarAnalyzerChip *carAnalyzerChip;
@@ -37,12 +34,14 @@ void setup(void)
 {
     psramInit();
 
+    pinMode(19, INPUT_PULLUP);
+
     // Initialisation du port Série, pour accéder aux logs.
     Serial.begin(115200);
     Serial.println();
 
     CarAnalyzerLog_d("###################################");
-    CarAnalyzerLog_d("on start:");
+    CarAnalyzerLog_d("Car-Analyzer - %s", VERSION);
     CarAnalyzerLog_d("Internal Total heap %u, internal Free Heap %u", ESP.getHeapSize(), ESP.getFreeHeap());
     CarAnalyzerLog_d("PSRam Total heap %u, PSRam Free Heap %u", ESP.getPsramSize(), ESP.getFreePsram());
     CarAnalyzerLog_d("ChipRevision %d, Cpu Freq %d, SDK Version %s", ESP.getChipRevision(), ESP.getCpuFreqMHz(), ESP.getSdkVersion());
@@ -52,7 +51,7 @@ void setup(void)
     updateTimers = (Timers *)ps_malloc(sizeof(Timers));
 
     // Initialisation du composant permettant de tracer le comportement de l'ESP32.
-    carAnalyzerChip = new CarAnalyzerChip(BATTERY_LEVEL_PIN);
+    carAnalyzerChip = new CarAnalyzerChip(BATTERY_LEVEL_PIN, ALIM_LEVEL_PIN);
     carAnalyzerChip->update();
 
     // Initialisation du composant permettant la gestion de la carte SD.
@@ -76,6 +75,9 @@ void setup(void)
             ESP.restart();
         }
     }
+
+    carAnalyzerSdCard->checkForUpdate();
+
     // Initializing object allowing to manage configuration data.
     carAnalyzerConfig = new CarAnalyzerConfig();
     if (carAnalyzerConfig->loadConfiguration(carAnalyzerSdCard->readJsonFile("/config.json")))
@@ -96,6 +98,7 @@ void setup(void)
         carAnalyzerGsm = new CarAnalyzerGsm(MODEM_PWRKEY, MODEM_FLIGHT);
 
         carAnalyzerGsm->begin(UART_BAUD, MODEM_RX, MODEM_TX);
+
         carAnalyzerGsm->connect(carAnalyzerConfig->getValue("gsmSimPin").c_str(), carAnalyzerConfig->getValue("gsmApn").c_str(), carAnalyzerConfig->getValue("gsmUser").c_str(), carAnalyzerConfig->getValue("gsmPassword").c_str());
         carAnalyzerGsm->update();
 
@@ -120,7 +123,6 @@ void setup(void)
         carAnalyzerGps->begin(UART_BAUD, MODEM_RX, MODEM_TX);
         carAnalyzerGps->setPrecision(carAnalyzerConfig->getValue("gpsPrecision").toInt());
         carAnalyzerGps->connect();
-        carAnalyzerGps->update();
 
         CarAnalyzerLog_d("After GPS initialization:");
         CarAnalyzerLog_d("Internal Total heap %u, internal Free Heap %u", ESP.getHeapSize(), ESP.getFreeHeap());
@@ -188,19 +190,46 @@ void loop(void)
     {
         carAnalyzerGsm->update();
 
-        if (carAnalyzerConfig->getValue("homeAssistantUse").equals("true"))
+        if (carAnalyzerConfig->getValue("homeAssistantUse").equals("true") && !carAnalyzerGsm->getData().isNull())
         {
-            CarAnalyzerLog_d("send to HA GSM: %d", carAnalyzerHomeAssistant->publish("GSM", carAnalyzerGsm->getData()));
+            if (!carAnalyzerHomeAssistant->publish("GSM", carAnalyzerGsm->getData()))
+            {
+                CarAnalyzerLog_w("Home Assistant Connection lost.");
+                carAnalyzerGsm->reconnect();
+            }
+        }
+    }
+
+    if (carAnalyzerConfig->getValue("bluetoothUse").equals("true") && (carAnalyzerChip->isBatteryPowered() || millis() - carAnalyzerObd->getLastUpdate() > 2000))
+    {
+        carAnalyzerObd->update();
+
+        if (!carAnalyzerObd->getDataRaw().isNull()) {
+            carAnalyzerSdCard->updateFile(carAnalyzerObd->getDataRaw(), "/OBD_data_raw.txt", FILE_APPEND, true);
+        }
+
+        if (!carAnalyzerObd->getData().isNull() && carAnalyzerConfig->getValue("homeAssistantUse").equals("true"))
+        {
+            if (!carAnalyzerHomeAssistant->publish("Car", carAnalyzerObd->getData()))
+            {
+                CarAnalyzerLog_w("Home Assistant Connection lost.");
+                carAnalyzerGsm->reconnect();
+            }
         }
     }
 
     if (carAnalyzerConfig->getValue("gpsUse").equals("true") && (carAnalyzerChip->isBatteryPowered() || millis() - carAnalyzerGps->getLastUpdate() > updateTimers->gpsTimer))
     {
+        
         carAnalyzerGps->update();
 
-        if (carAnalyzerGps->isValid() && carAnalyzerConfig->getValue("homeAssistantUse").equals("true"))
+        if (!carAnalyzerGps->getData().isNull() && carAnalyzerConfig->getValue("homeAssistantUse").equals("true"))
         {
-            CarAnalyzerLog_d("send to HA GPS: %d", carAnalyzerHomeAssistant->publish("GPS", carAnalyzerGps->getData()));
+            if (!carAnalyzerHomeAssistant->publish("GPS", carAnalyzerGps->getData()))
+            {
+                CarAnalyzerLog_w("Home Assistant Connection lost.");
+                carAnalyzerGsm->reconnect();
+            }
         }
         else
         {
@@ -208,18 +237,15 @@ void loop(void)
         }
     }
 
-    if (carAnalyzerConfig->getValue("bluetoothUse").equals("true") && (carAnalyzerChip->isBatteryPowered() || millis() - carAnalyzerObd->getLastUpdate() > 2000))
-    {
-        if (carAnalyzerObd->update() && carAnalyzerConfig->getValue("homeAssistantUse").equals("true"))
-        {
-            CarAnalyzerLog_d("send to HA CAR: %d", carAnalyzerHomeAssistant->publish("Car", carAnalyzerObd->getData()));
-        }
-    }
 
     if (carAnalyzerConfig->getValue("homeAssistantUse").equals("true") && (carAnalyzerChip->isBatteryPowered() || millis() - t > updateTimers->homeAssistantTimer))
     {
         t = millis();
-        CarAnalyzerLog_d("send to HA CHIP: %d", carAnalyzerHomeAssistant->publish("Chip", carAnalyzerChip->getData()));
+        if (!carAnalyzerHomeAssistant->publish("Chip", carAnalyzerChip->getData()))
+        {
+            CarAnalyzerLog_w("Home Assistant Connection lost.");
+            carAnalyzerGsm->reconnect();
+        }
     }
 
     if (carAnalyzerConfig->getValue("abrpUse").equals("true") && (carAnalyzerChip->isBatteryPowered() || millis() - carAnalyzerABRP->getLastUpdate() > updateTimers->abrpTimer))
@@ -237,7 +263,10 @@ void loop(void)
             carData = carAnalyzerObd->getData();
         }
 
-        carAnalyzerABRP->publish(gpsData, carData);
+        if (!gpsData.isNull() && !carData.isNull())
+        {
+            carAnalyzerABRP->publish(gpsData, carData);
+        }
     }
 
     if (carAnalyzerChip->isBatteryPowered())
@@ -251,6 +280,7 @@ void loop(void)
         // Puis on coupe l'ESP32 pour la durée demandée.
         CarAnalyzerLog_d("Deep sleep mode for %ld seconds... Good night!", carAnalyzerConfig->getValue("chipDeepSleepDuration").toInt());
 
+        esp_sleep_enable_ext0_wakeup(GPIO_NUM_36, 1);
         esp_sleep_enable_timer_wakeup(carAnalyzerConfig->getValue("chipDeepSleepDuration").toInt() * 1000000);
         delay(200);
 

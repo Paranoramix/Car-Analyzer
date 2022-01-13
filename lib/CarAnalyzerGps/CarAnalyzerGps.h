@@ -9,6 +9,8 @@
 #define TINY_GSM_USE_GPRS true
 #endif
 
+//#define DUMP_AT_COMMANDS
+
 #ifdef DUMP_AT_COMMANDS
 #include "../../include/StreamDebugger.h"
 #endif
@@ -34,6 +36,10 @@ private:
     unsigned long _lastUpdate;
 
     uint8_t _precision;
+
+    float _previousLatitude;
+    float _previousLongitude;
+    float _previousAltitude;
 
 public:
     /**
