@@ -70,7 +70,7 @@ boolean CarAnalyzerABRP::publish(JsonObject gpsJson, JsonObject carJson)
         }
     }
 
-    if (!doc.isNull())
+    if (!doc.isNull() && doc.containsKey("soc"))
     {
         doc["car_model"] = this->_abrpCarModel;
 

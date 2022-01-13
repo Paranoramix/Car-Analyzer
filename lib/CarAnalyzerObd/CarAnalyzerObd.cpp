@@ -195,10 +195,10 @@ bool CarAnalyzerObd::update(void)
             for (JsonPair kvc : kv.value().as<JsonObject>())
             {
                 // Maintenant, on peut faire la requête auprès de l'ODB
-                //               if (this->readCarData(kv.key().c_str(), kvc.key().c_str(), 0))
+                if (this->readCarData(kv.key().c_str(), kvc.key().c_str(), 0))
                 {
-                    //                    String data = String(this->_elm->payload);
-
+                    String data = String(this->_elm->payload);
+                    /*
                     String data = "";
 
                     if (String(kvc.key().c_str()).equals("220101"))
@@ -230,7 +230,7 @@ bool CarAnalyzerObd::update(void)
                     {
                         data = "00F0:62B002E000001:00FFAF0025E9002:0000AAAAAAAAAA";
                     }
-
+*/
                     (*this->_dataRaw)[kvc.key().c_str()] = data;
 
                     // On va nettoyer la chaine de caractères pour traiter les données.
