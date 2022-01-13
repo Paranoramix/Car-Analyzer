@@ -18,3 +18,4 @@
 #define BT_PIN_CTRL         22
 
 #define BATTERY_LEVEL_PIN   35
+#define ALIM_LEVEL_PIN      36
