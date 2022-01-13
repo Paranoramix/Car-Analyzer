@@ -36,11 +36,11 @@ boolean CarAnalyzerABRP::publish(JsonObject gpsJson, JsonObject carJson)
     if (!carJson.isNull())
     {
 
-        if (gpsJson.containsKey("SOCDisplay_battery_%"))
+        if (carJson.containsKey("SOCDisplay_battery_%"))
         {
             doc["soc"] = carJson["SOCDisplay_battery_%"];
         }
-        if (gpsJson.containsKey("SOH_battery_%"))
+        if (carJson.containsKey("SOH_battery_%"))
         {
             doc["soh"] = carJson["SOH_battery_%"];
         }
