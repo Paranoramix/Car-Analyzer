@@ -6,3 +6,5 @@
 data/
 secrets.ini
 sdCard/config.json
+versioning
+.vscode/settings.json
