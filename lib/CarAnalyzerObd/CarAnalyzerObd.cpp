@@ -162,7 +162,7 @@ bool CarAnalyzerObd::update(void)
                 String formula = parameter.value().as<JsonObject>()["formula"].as<String>();
                 JsonArray vars = parameter.value().as<JsonObject>()["vars"].as<JsonArray>();
 
-                CarAnalyzerLog_d("Calcul %s: %s", parameter.key().c_str(), formula.c_str());
+                CarAnalyzerLog_v("Calcul %s: %s", parameter.key().c_str(), formula.c_str());
 
                 String homeAssistantSuffix = "";
                 if (parameter.value().as<JsonObject>().containsKey("HomeAssistantParameter"))
@@ -178,7 +178,7 @@ bool CarAnalyzerObd::update(void)
                     }
                 }
 
-                CarAnalyzerLog_d("Calcul: %s", formula.c_str());
+                CarAnalyzerLog_v("Calcul: %s", formula.c_str());
 
                 // Maintenant on lance le calcul
                 int err;
