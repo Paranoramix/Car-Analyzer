@@ -132,6 +132,54 @@
                 "length": 8,
                 "formula": "x/3600",
                 "HomeAssistantParameter": "__h"
+            },
+            "BMSMainRelay": {
+                "start": 28,
+                "length": 1,
+                "formula": "x%2",
+                "HomeAssistantParameter": ""
+            },
+            "HVCharging": {
+                "start": 27,
+                "length": 1,
+                "formula": "floor(x/8)%2",
+                "HomeAssistantParameter": ""
+            },
+            "CCSPlug": {
+                "start": 27,
+                "length": 1,
+                "formula": "floor(x/4)%2",
+                "HomeAssistantParameter": ""
+            },
+            "ACPlug": {
+                "start": 27,
+                "length": 1,
+                "formula": "floor(x/2)%2",
+                "HomeAssistantParameter": ""
+            },
+            "Ignition": {
+                "start": 106,
+                "length": 1,
+                "formula": "floor(x/4)%2",
+                "HomeAssistantParameter": ""
+            },
+            "Resistance": {
+                "start": 123,
+                "length": 4,
+                "formula": "x",
+                "HomeAsisstantParameter": "__kOhm"
+            },
+            "RPM1": {
+                "start": 115,
+                "length": 4,
+                "formula": "(x-floor(x/51200)*65536)",
+                "HomeAsisstantParameter": "__RPM"
+            },
+            "RPM2": {
+                "start": 119,
+                "length": 4,
+                "formula": "(x-floor(x/51200)*65536)",
+                "HomeAsisstantParameter": "__RPM"
             }
         },
         "220105": {
@@ -178,31 +226,6 @@
                 "length": 2,
                 "formula": "(x-floor(x/128)*256)",
                 "HomeAssistantParameter": "_temperature_°C"
-            }
-        }
-
-    },
-    "AT SH 7E2": {
-        "2101": {
-            "TransmissionSelected": {
-                "start": 17,
-                "length": 2,
-                "formula": "x",
-                "HomeAssistantParameter": "__"
-            }
-        },
-        "2102": {
-            "AuxBatteryCurrent": {
-                "start": 49,
-                "length": 4,
-                "formula": "(x-floor(x/128)*256)/10",
-                "HomeAssistantParameter": "_current_A"
-            },
-            "AuxBatterySOC": {
-                "start": 53,
-                "length": 2,
-                "formula": "x/100",
-                "HomeAssistantParameter": "_battery_%"
             }
         }
     },
@@ -286,11 +309,86 @@
     },
     "CALCULATED": {
         "BatteryPower": {
-            "nbVars": 2,
-            "var1": "batteryCurrent_current_A",
-            "var2": "batteryVoltage_voltage_V",
-            "formula": "x*y*0.001",
+            "vars": [
+                "batteryCurrent_current_A",
+                "batteryVoltage_voltage_V"
+            ],
+            "formula": "batteryCurrent_current_A*batteryVoltage_voltage_V*0.001",
             "HomeAssistantParameter": "_power_kW"
+        },
+        "BatteryAverageTemperature": {
+            "vars": [
+                "BatteryTemperature1_temperature_°C",
+                "BatteryTemperature2_temperature_°C",
+                "BatteryTemperature3_temperature_°C",
+                "BatteryTemperature4_temperature_°C",
+                "BatteryTemperature5_temperature_°C"
+            ],
+            "formula": "(BatteryTemperature1_temperature_°C+BatteryTemperature2_temperature_°C+BatteryTemperature3_temperature_°C+BatteryTemperature4_temperature_°C+BatteryTemperature5_temperature_°C)/5",
+            "homeAssistantParameter": "_temperature_°C"
+        },
+        "EstimatedTime2.3kW": {
+            "vars": [
+                "SOCDisplay_battery_%"
+            ],
+            "formula": "(1-(SOCDisplay_battery_%/100))*3193/60",
+            "homeAssistantParameter": "__h"
+        },
+        "EstimatedTime3.7kW": {
+            "vars": [
+                "SOCDisplay_battery_%"
+            ],
+            "formula": "(1-(SOCDisplay_battery_%/100))*1993/60",
+            "homeAssistantParameter": "__h"
+        },
+        "EstimatedTime27.4kW": {
+            "vars": [
+                "SOCDisplay_battery_%"
+            ],
+            "formula": "(1-(SOCDisplay_battery_%/100))*1008/60",
+            "homeAssistantParameter": "__h"
+        },
+        "EstimatedTime11kW": {
+            "vars": [
+                "SOCDisplay_battery_%"
+            ],
+            "formula": "(1-(SOCDisplay_battery_%/100))*665/60",
+            "homeAssistantParameter": "__h"
+        },
+        "EstimatedTime50kW": {
+            "vars": [
+                "SOCDisplay_battery_%"
+            ],
+            "formula": "(1)-(SOCDisplay_battery_%/100))*92",
+            "homeAssistantParameter": "__h"
+        },
+        "EstimatedTime100kW": {
+            "vars": [
+                "SOCDisplay_battery_%"
+            ],
+            "formula": "(1-(SOCDisplay_battery_%/100))*52",
+            "homeAssistantParameter": "__h"
+        },
+        "EstimatedTime150kW": {
+            "vars": [
+                "SOCDisplay_battery_%"
+            ],
+            "formula": "(1-(SOCDisplay_battery_%/100))*38",
+            "homeAssistantParameter": "__h"
+        },
+        "EstimatedTime175kW": {
+            "vars": [
+                "SOCDisplay_battery_%"
+            ],
+            "formula": "(1-(SOCDisplay_battery_%/100))*33",
+            "homeAssistantParameter": "__h"
+        },
+        "EstimatedTime350kW": {
+            "vars": [
+                "SOCDisplay_battery_%"
+            ],
+            "formula": "(1-(SOCDisplay_battery_%/100))*26",
+            "homeAssistantParameter": "__h"
         }
     }
 
